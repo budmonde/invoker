@@ -80,6 +80,10 @@ pip install invoker
 Basic tutorial and documentation at
 [invoke.readthedocs.io](https://invoke.readthedocs.io/).
 
+## Feature To-do list
+
+1. Enable loading multiple deps of the same type from a module
+
 ## Dependencies
 
 ```

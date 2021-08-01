@@ -15,14 +15,16 @@ class Project:
 
     def __init__(self, root_path):
         self.root_path = Path(root_path)
-        self.options_path = root_path / "options.py"
+        self.options_path = root_path / "options"
+        self.options_init_path = self.options_path / "__init__.py"
         self.config_path = root_path / ".invoker"
         self.loaded = False
 
     def initialize(self):
-        if self.options_path.exists():
-            raise Exception(f"options.py file already exists at {self.options_path}.")
-        copy_resource("options.py", self.options_path, sign=True)
+        if self.options_path.exists() or self.options_init_path.exists():
+            raise Exception(f"options module already exists at {self.options_path}.")
+        self.options_path.mkdir()
+        copy_resource("options.py", self.options_init_path, sign=True)
 
         if self.config_path.exists():
             raise Exception(f"project.conf file already exists at {self.config_path}.")
@@ -43,10 +45,10 @@ class Project:
         if not self.loaded:
             raise Exception("Cannot validate project state before loading it.")
 
-        if not self.options_path.exists():
+        if not (self.options_path.exists() and self.options_init_path.exists()):
             raise Exception("options.py file is missing in project.")
         if not self.config_path.exists():
-            raise Exception("project.conf file is missing in project.")
+            raise Exception(".invoker file is missing in project.")
         for script_name in self.scripts:
             script_path = self.root_path / f"{script_name}.py"
             if not script_path.exists():
