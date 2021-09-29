@@ -24,7 +24,10 @@ mode_to_config = yaml.load(open("project.yml"), Loader=yaml.FullLoader)
 
 def build(mode):
     # Load Script Config
-    script_config = importlib.import_module(mode).CONFIG
+    script_module = importlib.import_module(mode)
+    script_args = script_module.args()
+    # TODO: Add argparser here
+    script_config = script_module.build_config(script_args)
     logger_dict = {
         "version": 1,
         "formatters": {
