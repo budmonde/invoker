@@ -26,7 +26,7 @@ def build(mode):
     # Load Script Config
     script_module = importlib.import_module(mode)
     script_args = script_module.args()
-    # TODO: Add argparser here
+    script_args = _build_argparser(script_args)
     script_config = script_module.build_config(script_args)
     logger_dict = {
         "version": 1,
@@ -67,6 +67,25 @@ def build(mode):
         json.dump(script_config, open(save_root / "config.json", "w"))
 
     return _deserialize_config(script_config)
+
+
+def _build_argparser(args):
+    parser = argparse.ArgumentParser()
+    for k, v in args.items():
+        if type(v) == list:
+            parser.add_argument(
+                f"--{k}",
+                type=type(v[0]) if len(v) > 0 else str,
+                nargs="+",
+                default=v
+            )
+        else:
+            parser.add_argument(
+                f"--{k}",
+                type=type(v),
+                default=v
+            )
+    return vars(parser.parse_args())
 
 
 def _serialize_opt(opt):
