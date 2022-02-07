@@ -104,6 +104,11 @@ def _build_argparser(default_args, override_args):
                 nargs="+",
                 default=v
             )
+        elif type(v) == bool:
+            parser.add_argument(
+                f"--{k}",
+                action="store_true" if not v else "store_false",
+            )
         else:
             parser.add_argument(
                 f"--{k}",
