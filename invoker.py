@@ -54,23 +54,3 @@ def script(script_name):
     project.create_script(script_name)
     project.validate()
     click.echo("Success!")
-
-
-@cli.group()
-@click.argument("script_name")
-@click.pass_context
-def update(ctx, script_name):
-    ctx.ensure_object(dict)
-    ctx.obj['script_name'] = script_name
-
-
-@update.command()
-@click.argument("module_name")
-@click.pass_context
-def add(ctx, module_name):
-    script_name = ctx.obj['script_name']
-    click.echo(f"Adding module {module_name} to script {script_name}...")
-    project = Project(Path()).load()
-    project.update_script_add_module(script_name, module_name)
-    project.validate()
-    click.echo("Success!")

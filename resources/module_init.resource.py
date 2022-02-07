@@ -20,7 +20,7 @@ _CLASSES = {
 }
 
 
-def _get_class(mode):
+def get_class(mode):
     cls_name = (
         "".join([token.capitalize() for token in mode.split("_")])
         + _PACKAGE_NAME
@@ -28,19 +28,3 @@ def _get_class(mode):
     if cls_name not in _CLASSES.keys():
         raise TypeError(f"Invalid {__package__} mode: {cls_name}")
     return _CLASSES[cls_name]
-
-
-def build(opt):
-    mode = getattr(opt, f"{__package__}_mode")
-    cls = _get_class(mode)
-    return cls(getattr(opt, __package__))
-
-
-def config(mode):
-    cls = _get_class(mode)
-    return cls.config()
-
-
-def deps(mode):
-    cls = _get_class(mode)
-    return cls.deps()

@@ -1,3 +1,4 @@
+from datetime import date
 from importlib import resources
 import hashlib
 
@@ -15,9 +16,23 @@ def compute_resource_hash(resource_fn):
 
 def compute_file_hash(path):
     with open(path, "r") as f:
-        stored_hash = f.readline().strip().split(" ")[1]
+        while True:
+            hash_line = f.readline()
+            if hash_line.startswith("# Hash:"):
+                break
+        stored_hash = hash_line.strip().split("\t")[1]
         computed_hash = _compute_hash(f.read().encode('ascii'))
     return stored_hash, computed_hash
+
+
+GENERATED_MESSAGE = f"""\
+# Invoker: v0.0.1
+# DO NOT MANUALLY EDIT THIS FILE.
+#
+# This script was generated with invoker.
+# To regenerate file, run `invoker rebuild`.
+# Date:\t{date.today().strftime("%d/%m/%Y")}
+"""
 
 
 def copy_resource(src_fn, dst_path, sign=False, preprocess_fn=lambda l: l):
@@ -25,7 +40,8 @@ def copy_resource(src_fn, dst_path, sign=False, preprocess_fn=lambda l: l):
         file_hash = _compute_hash(f.read())
     with resources.open_text("resources", src_fn) as inf, open(dst_path, "w") as outf:
         if sign:
-            outf.write(f"# {file_hash}\n")
+            outf.write(GENERATED_MESSAGE)
+            outf.write(f"# Hash:\t{file_hash}\n")
         for line in inf:
             outf.write(preprocess_fn(line))
 
