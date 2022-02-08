@@ -4,16 +4,16 @@ from invoker import Script
 
 class __SCRIPT__(Script):
     @classmethod
+    def args(cls):
+        # Specify arguments to pass from command line
+        return {}
+
+    @classmethod
     def modules(cls):
         return {
             # Add module dependencies
             # "module": "mode"
         }
-
-    @classmethod
-    def args(cls):
-        # Specify arguments to pass from command line
-        return {}
 
     @classmethod
     def build_config(cls, args):
@@ -30,4 +30,4 @@ class __SCRIPT__(Script):
 
 
 if __name__ == "__main__":
-    __SCRIPT__().run()
+    __SCRIPT__().initialize().run()

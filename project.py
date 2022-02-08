@@ -61,6 +61,22 @@ class Project:
             script_path,
             preprocess_fn=lambda l: l.replace("__SCRIPT__", to_camel_case(script_name)),
         )
+        script_path.chmod(0o744)
+
+    def create_workflow(self, workflow_name):
+        # Fix workflow name
+        if workflow_name.endswith(".py"):
+            workflow_name = workflow_name.removesuffix(".py")
+        # Add boilerplate base workflow
+        workflow_path = self.root_path / f"{workflow_name}.py"
+        if workflow_path.exists():
+            raise Exception(f"workflow already exists at {workflow_path}.")
+        copy_resource(
+            "workflow.resource.py",
+            workflow_path,
+            preprocess_fn=lambda l: l.replace("__WORKFLOW__", to_camel_case(workflow_name)),
+        )
+        workflow_path.chmod(0o744)
 
     def rebuild(self):
         self._rebuild_resource("invoker.resource.py", self.invoker_path, sign=True)

@@ -26,8 +26,10 @@ class Module:
 class Script:
     def __init__(self, inp_args=None):
         # Parse Script Arguments
-        all_args = _build_argparser(self.args(), inp_args)
-        conf = self.build_config(all_args)
+        self.all_args = _build_argparser(self.args(), inp_args)
+
+    def initialize(self):
+        conf = self.build_config(self.all_args)
         # Load Modules
         module_conf = {}
         for module, module_mode in self.modules().items():
@@ -53,13 +55,14 @@ class Script:
                 open(save_root / "conf.json", "w"))
         # Deserialize Script Config
         self.opt = _deserialize_config(conf)
-
-    @classmethod
-    def modules(cls):
-        return {}
+        return self
 
     @classmethod
     def args(cls):
+        return {}
+
+    @classmethod
+    def modules(cls):
         return {}
 
     @classmethod
@@ -68,6 +71,35 @@ class Script:
 
     def run(self):
         pass
+
+
+class Workflow:
+    def __init__(self):
+        all_args = _build_argparser(self.args())
+        self.arg_dict = self.build_script_args(all_args)
+
+    @classmethod
+    def args(cls):
+        return {}
+
+    @classmethod
+    def scripts(cls):
+        return []
+
+    @classmethod
+    def build_script_args(cls, args):
+        arg_dict = {}
+        for script in cls.scripts():
+            arg_dict[script] = {}
+        return arg_dict
+
+    def run(self):
+        for script in self.scripts():
+            module = importlib.import_module(script)
+            cls = getattr(module, _to_camel_case(script))
+            cls_inst = cls().initialize()
+            cls_inst.all_args = self.arg_dict[script]
+            cls_inst.run()
 
 
 def _init_logger():
@@ -94,7 +126,7 @@ def _init_logger():
     logging.config.dictConfig(logger_dict)
 
 
-def _build_argparser(default_args, override_args):
+def _build_argparser(default_args, override_args=None):
     parser = argparse.ArgumentParser()
     for k, v in default_args.items():
         if type(v) == list:
@@ -136,3 +168,7 @@ def _deserialize_config(config):
         else:
             setattr(opt, k, v)
     return opt
+
+
+def _to_camel_case(string):
+    return "".join([token.capitalize() for token in string.split("_")])

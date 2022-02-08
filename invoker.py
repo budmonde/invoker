@@ -54,3 +54,13 @@ def script(script_name):
     project.create_script(script_name)
     project.validate()
     click.echo("Success!")
+
+
+@create.command()
+@click.argument("workflow_name")
+def workflow(workflow_name):
+    click.echo(f"Creating new workflow {workflow_name}...")
+    project = Project(Path()).load()
+    project.create_workflow(workflow_name)
+    project.validate()
+    click.echo("Success!")
