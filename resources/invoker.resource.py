@@ -1,9 +1,11 @@
 import argparse
 import copy
+import cProfile as profile
 import importlib
 import json
 import logging
 import logging.config
+import pstats
 import re
 from pathlib import Path
 
@@ -72,6 +74,14 @@ class Script:
 
     def run(self):
         pass
+
+    def profile(self, top=10):
+        prof = profile.Profile()
+        prof.enable()
+        self.run()
+        prof.disable()
+        stats = pstats.Stats(prof).strip_dirs().sort_stats("cumtime")
+        stats.print_stats(top)
 
 
 class Workflow:
