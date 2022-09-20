@@ -10,6 +10,64 @@ import re
 from pathlib import Path
 
 
+def initialize_logger(fname):
+    logfile_root = Path("./logs")
+    logfile_root.mkdir(exist_ok=True, parents=True)
+    logfile_path = logfile_root / f"{fname}.log"
+    do_rollover = True if logfile_path.exists() else False
+    logger_dict = {
+        "version": 1,
+        "formatters": {
+            "verbose": {
+                "format": "%(asctime)s,%(msecs)d [%(levelname)-8s] %(filename)s:%(lineno)d.%(funcName)s() %(message)s",
+                "datefmt": "%Y-%m-%d %H:%M:%S",
+            },
+            "pretty": {
+                "format": "%(asctime)s [%(levelname)-8s] %(filename)s:%(lineno)d.%(funcName)s() %(message)s",
+                "datefmt": "%H:%M:%S",
+                "class": "invoker.InvokerFormatter",
+            },
+        },
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "formatter": "pretty",
+                "stream": "ext://sys.stdout"
+            },
+            "file": {
+                "class": "logging.handlers.RotatingFileHandler",
+                "formatter": "verbose",
+                "filename": logfile_path,
+                "maxBytes": 1048576,  # 1MB
+                "backupCount": 20,
+            }
+        },
+        "root": {
+            "level": "INFO",
+            "handlers": ["console", "file"]
+        }
+    }
+    logging.config.dictConfig(logger_dict)
+    if do_rollover:
+        logging.getLogger("root").handlers[1].doRollover()
+
+
+class InvokerFormatter(logging.Formatter):
+    LVL2COLOR = {
+        logging.DEBUG: "\x1b[38m", #  grey
+        logging.INFO: "\x1b[36m", #  blue
+        logging.WARNING: "\x1b[33m", #  yellow
+        logging.ERROR: "\x1b[31m", #  red
+        logging.CRITICAL: "\x1b[31;1m", #  bold_red
+    }
+    RESET = "\x1b[0m"
+
+    def format(self, record):
+        out = super().format(record)
+        color = self.LVL2COLOR.get(record.levelno)
+        return color + logging.Formatter.format(self, record) + self.RESET
+
+
 class Module:
     def __init__(self, inp_args=None):
         # Build Config
@@ -31,7 +89,7 @@ class Script:
     def __init__(self, inp_args=None):
         self.inp_args = inp_args
         # Initialize logger
-        _init_logger(_to_underscore_case(type(self).__name__))
+        initialize_logger(_to_underscore_case(type(self).__name__))
 
         # Parse Arguments
         parser = _build_argparser(self.args())
@@ -131,63 +189,6 @@ class Workflow:
         prof.disable()
         stats = pstats.Stats(prof).strip_dirs().sort_stats("cumtime")
         stats.print_stats(top)
-
-class InvokerFormatter(logging.Formatter):
-    LVL2COLOR = {
-        logging.DEBUG: "\x1b[38m", #  grey
-        logging.INFO: "\x1b[36m", #  blue
-        logging.WARNING: "\x1b[33m", #  yellow
-        logging.ERROR: "\x1b[31m", #  red
-        logging.CRITICAL: "\x1b[31;1m", #  bold_red
-    }
-    RESET = "\x1b[0m"
-
-    def format(self, record):
-        out = super().format(record)
-        color = self.LVL2COLOR.get(record.levelno)
-        return color + logging.Formatter.format(self, record) + self.RESET
-
-def _init_logger(fname):
-    logfile_root = Path("./logs")
-    logfile_root.mkdir(exist_ok=True, parents=True)
-    logfile_path = logfile_root / f"{fname}.log"
-    do_rollover = True if logfile_path.exists() else False
-    logger_dict = {
-        "version": 1,
-        "formatters": {
-            "verbose": {
-                "format": "%(asctime)s,%(msecs)d [%(levelname)-8s] %(filename)s:%(lineno)d.%(funcName)s() %(message)s",
-                "datefmt": "%Y-%m-%d %H:%M:%S",
-            },
-            "pretty": {
-                "format": "%(asctime)s [%(levelname)-8s] %(filename)s:%(lineno)d.%(funcName)s() %(message)s",
-                "datefmt": "%H:%M:%S",
-                "class": "invoker.InvokerFormatter",
-            },
-        },
-        "handlers": {
-            "console": {
-                "class": "logging.StreamHandler",
-                "formatter": "pretty",
-                "stream": "ext://sys.stdout"
-            },
-            "file": {
-                "class": "logging.handlers.RotatingFileHandler",
-                "formatter": "verbose",
-                "filename": logfile_path,
-                "maxBytes": 1048576,  # 1MB
-                "backupCount": 20,
-            }
-        },
-        "root": {
-            "level": "INFO",
-            "handlers": ["console", "file"]
-        }
-    }
-    logging.config.dictConfig(logger_dict)
-    if do_rollover:
-        logging.getLogger("root").handlers[1].doRollover()
-
 
 def _build_argparser(default_args, key_prefix=None, parser=None):
     if parser is None:
