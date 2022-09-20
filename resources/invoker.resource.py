@@ -4,6 +4,7 @@ import importlib
 import json
 import logging
 import logging.config
+import re
 from pathlib import Path
 
 
@@ -42,7 +43,7 @@ class Script:
             module_conf[module] = _serialize_opt(cls_inst.opt)
         conf.update(module_conf)
         # Initialize logger
-        _init_logger()
+        _init_logger(_to_underscore_case(type(self).__name__))
         # Save Config
         if "path" in conf:
             save_root = Path(conf["path"])
@@ -102,28 +103,61 @@ class Workflow:
             cls_inst.run()
 
 
-def _init_logger():
+class InvokerFormatter(logging.Formatter):
+    LVL2COLOR = {
+        logging.DEBUG: "\x1b[38m", #  grey
+        logging.INFO: "\x1b[36m", #  blue
+        logging.WARNING: "\x1b[33m", #  yellow
+        logging.ERROR: "\x1b[31m", #  red
+        logging.CRITICAL: "\x1b[31;1m", #  bold_red
+    }
+    RESET = "\x1b[0m"
+
+    def format(self, record):
+        out = super().format(record)
+        color = self.LVL2COLOR.get(record.levelno)
+        return color + logging.Formatter.format(self, record) + self.RESET
+
+def _init_logger(fname):
+    logfile_root = Path("./logs")
+    logfile_root.mkdir(exist_ok=True, parents=True)
+    logfile_path = logfile_root / f"{fname}.log"
+    do_rollover = True if logfile_path.exists() else False
     logger_dict = {
         "version": 1,
         "formatters": {
-            "simple": {
-                "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            }
+            "verbose": {
+                "format": "%(asctime)s,%(msecs)d [%(levelname)-8s] %(filename)s:%(lineno)d.%(funcName)s() %(message)s",
+                "datefmt": "%Y-%m-%d %H:%M:%S",
+            },
+            "pretty": {
+                "format": "%(asctime)s [%(levelname)-8s] %(filename)s:%(lineno)d.%(funcName)s() %(message)s",
+                "datefmt": "%H:%M:%S",
+                "class": "invoker.InvokerFormatter",
+            },
         },
         "handlers": {
             "console": {
                 "class": "logging.StreamHandler",
-                "level": "DEBUG",
-                "formatter": "simple",
+                "formatter": "pretty",
                 "stream": "ext://sys.stdout"
+            },
+            "file": {
+                "class": "logging.handlers.RotatingFileHandler",
+                "formatter": "verbose",
+                "filename": logfile_path,
+                "maxBytes": 1048576,  # 1MB
+                "backupCount": 20,
             }
         },
         "root": {
-            "level": "DEBUG",
-            "handlers": ["console"]
+            "level": "INFO",
+            "handlers": ["console", "file"]
         }
     }
     logging.config.dictConfig(logger_dict)
+    if do_rollover:
+        logging.getLogger("root").handlers[1].doRollover()
 
 
 def _build_argparser(default_args, override_args=None):
@@ -172,3 +206,6 @@ def _deserialize_config(config):
 
 def _to_camel_case(string):
     return "".join([token.capitalize() for token in string.split("_")])
+
+def _to_underscore_case(string):
+    return "_".join([token.lower() for token in re.findall("[A-Z][^A-Z]*", string)])
