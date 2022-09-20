@@ -3,6 +3,9 @@ import subprocess
 
 from util import copy_resource, compute_resource_hash, compute_file_hash, to_camel_case
 
+class InvokerError(Exception):
+    pass
+
 class Project:
     def __init__(self, root_path):
         self.root_path = Path(root_path)
@@ -10,7 +13,7 @@ class Project:
 
     def initialize(self):
         if self.invoker_path.exists():
-            raise Exception(f"invoker module already exists at {self.invoker_path}.")
+            raise InvokerError(f"invoker module already exists at {self.invoker_path}.")
         copy_resource("invoker.resource.py", self.invoker_path, sign=True)
         self.validate()
         return self
@@ -21,7 +24,7 @@ class Project:
 
     def validate(self):
         if not self.invoker_path.exists():
-            raise Exception("invoker.py file is missing in project.")
+            raise InvokerError("invoker.py file is missing in project.")
         return True
 
     def lint(self):
@@ -33,7 +36,7 @@ class Project:
         # Create module directory
         module_path = self.root_path / module_name
         if module_path.exists():
-            raise Exception(f"module already exists at {module_path}.")
+            raise InvokerError(f"module already exists at {module_path}.")
         module_path.mkdir()
 
         # Generate module __init__.py resource
@@ -55,7 +58,7 @@ class Project:
         # Add boilerplate base script
         script_path = self.root_path / f"{script_name}.py"
         if script_path.exists():
-            raise Exception(f"script already exists at {script_path}.")
+            raise InvokerError(f"script already exists at {script_path}.")
         copy_resource(
             "script.resource.py",
             script_path,
@@ -70,7 +73,7 @@ class Project:
         # Add boilerplate base workflow
         workflow_path = self.root_path / f"{workflow_name}.py"
         if workflow_path.exists():
-            raise Exception(f"workflow already exists at {workflow_path}.")
+            raise InvokerError(f"workflow already exists at {workflow_path}.")
         copy_resource(
             "workflow.resource.py",
             workflow_path,
@@ -93,7 +96,7 @@ class Project:
 
     def _rebuild_resource(self, resource_name, path, sign=False):
         if not path.exists():
-            raise Exception(f"{resource_name} does not exist at {path}!")
+            raise InvokerError(f"{resource_name} does not exist at {path}!")
 
         resource_hash = compute_resource_hash(resource_name)
         cached_hash, computed_hash = compute_file_hash(path)

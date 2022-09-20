@@ -2,7 +2,7 @@ from pathlib import Path
 
 import click
 
-from project import Project
+from project import InvokerError, Project
 
 
 @click.group()
@@ -12,23 +12,33 @@ def cli():
 
 @cli.command()
 def init():
-    click.echo("Initializing new project at current directory...")
-    project = Project(Path()).initialize()
-    click.echo("Success!")
+    click.secho("Initializing new project at current directory...", fg="yellow")
+    project = Project(Path())
+    try:
+        project.initialize()
+        click.secho("Success!", fg="green")
+    except InvokerError as err:
+        click.secho("Invoker Error: ", err=True, nl=False, fg="red")
+        click.echo(err, err=True)
 
 
 @cli.command()
 def lint():
-    project = Project(Path()).load()
+    project = Project(Path())
+    project.load()
     project.lint()
 
 
 @cli.command()
 def rebuild():
-    click.echo("Rebuildng project...")
+    click.secho("Rebuildng project...", fg="yellow")
     project = Project(Path()).load()
-    project.rebuild()
-    click.echo("Success!")
+    try:
+        project.rebuild()
+        click.secho("Success!", fg="green")
+    except InvokerError as err:
+        click.secho("Invoker Error: ", err=True, nl=False, fg="red")
+        click.echo(err, err=True)
 
 
 @cli.group()
@@ -39,28 +49,43 @@ def create():
 @create.command()
 @click.argument("module_name")
 def module(module_name):
-    click.echo(f"Creating new module {module_name}...")
-    project = Project(Path()).load()
-    project.create_module(module_name)
-    project.validate()
-    click.echo("Success!")
+    click.secho(f"Creating new module {module_name}...", fg="yellow")
+    project = Project(Path())
+    try:
+        project.load()
+        project.create_module(module_name)
+        project.validate()
+        click.secho("Success!", fg="green")
+    except InvokerError as err:
+        click.secho("Invoker Error: ", err=True, nl=False, fg="red")
+        click.echo(err, err=True)
 
 
 @create.command()
 @click.argument("script_name")
 def script(script_name):
-    click.echo(f"Creating new script {script_name}...")
-    project = Project(Path()).load()
-    project.create_script(script_name)
-    project.validate()
-    click.echo("Success!")
+    click.secho(f"Creating new script {script_name}...", fg="yellow")
+    project = Project(Path())
+    try:
+        project.load()
+        project.create_script(script_name)
+        project.validate()
+        click.secho("Success!", fg="green")
+    except InvokerError as err:
+        click.secho("Invoker Error: ", err=True, nl=False, fg="red")
+        click.echo(err, err=True)
 
 
 @create.command()
 @click.argument("workflow_name")
 def workflow(workflow_name):
-    click.echo(f"Creating new workflow {workflow_name}...")
-    project = Project(Path()).load()
-    project.create_workflow(workflow_name)
-    project.validate()
-    click.echo("Success!")
+    click.secho(f"Creating new workflow {workflow_name}...", fg="yellow")
+    project = Project(Path())
+    try:
+        project.load()
+        project.create_workflow(workflow_name)
+        project.validate()
+        click.secho("Success!", fg="green")
+    except InvokerError as err:
+        click.secho("Invoker Error: ", err=True, nl=False, fg="red")
+        click.echo(err, err=True)
