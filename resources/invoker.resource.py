@@ -12,9 +12,10 @@ from pathlib import Path
 
 class Module:
     def __init__(self, inp_args=None):
-        all_args = self.args()
-        all_args.update(inp_args)
-        conf = self.build_config(all_args)
+        # Build Config
+        if inp_args is None:
+            conf = self.build_config(self.args)
+        conf = self.build_config(inp_args)
         self.opt = _deserialize_config(conf)
 
     @classmethod
@@ -28,24 +29,33 @@ class Module:
 
 class Script:
     def __init__(self, inp_args=None):
-        # Parse Script Arguments
-        self.all_args = _build_argparser(self.args(), inp_args)
+        self.inp_args = inp_args
+        # Initialize logger
+        _init_logger(_to_underscore_case(type(self).__name__))
+
+        # Parse Arguments
+        parser = _build_argparser(self.args())
+        for module, module_mode in self.modules().items():
+            cls = importlib.import_module(module).get_class(module_mode)
+            parser = _build_argparser(cls.args(), module, parser)
+        self.all_args = vars(parser.parse_args(self.inp_args))
 
     def initialize(self):
-        conf = self.build_config(self.all_args)
-        # Load Modules
+        # Build Config
+        conf = self.build_config(self.all_args.copy())
         module_conf = {}
         for module, module_mode in self.modules().items():
             cls = importlib.import_module(module).get_class(module_mode)
-            if module not in conf.keys():
-                cls_inst = cls({})
-            else:
-                cls_inst = cls(conf[module])
+            module_args = {
+                k.split(".")[1]: v
+                for k, v in self.all_args.items()
+                if len(k.split(".")) == 2 and k.split(".")[0] == module
+            }
+            cls_inst = cls(module_args)
             setattr(self, module, cls_inst)
             module_conf[module] = _serialize_opt(cls_inst.opt)
         conf.update(module_conf)
-        # Initialize logger
-        _init_logger(_to_underscore_case(type(self).__name__))
+
         # Save Config
         if "path" in conf:
             save_root = Path(conf["path"])
@@ -56,7 +66,8 @@ class Script:
                     "config": conf,
                 },
                 open(save_root / "conf.json", "w"))
-        # Deserialize Script Config
+
+        # Deserialize Options
         self.opt = _deserialize_config(conf)
         return self
 
@@ -86,7 +97,8 @@ class Script:
 
 class Workflow:
     def __init__(self):
-        all_args = _build_argparser(self.args())
+        parser = _build_argparser(self.args())
+        all_args = vars(parser.parse_args())
         self.arg_dict = self.build_script_args(all_args)
 
     @classmethod
@@ -112,6 +124,13 @@ class Workflow:
             cls_inst.all_args = self.arg_dict[script]
             cls_inst.run()
 
+    def profile(self, top=10):
+        prof = profile.Profile()
+        prof.enable()
+        self.run()
+        prof.disable()
+        stats = pstats.Stats(prof).strip_dirs().sort_stats("cumtime")
+        stats.print_stats(top)
 
 class InvokerFormatter(logging.Formatter):
     LVL2COLOR = {
@@ -170,28 +189,35 @@ def _init_logger(fname):
         logging.getLogger("root").handlers[1].doRollover()
 
 
-def _build_argparser(default_args, override_args=None):
-    parser = argparse.ArgumentParser()
+def _build_argparser(default_args, key_prefix=None, parser=None):
+    if parser is None:
+        parser = argparse.ArgumentParser()
+    def _build_key(kname):
+        return f"--{kname}" if key_prefix is None else f"--{key_prefix}.{kname}"
     for k, v in default_args.items():
-        if type(v) == list:
-            parser.add_argument(
-                f"--{k}",
-                type=type(v[0]) if len(v) > 0 else str,
-                nargs="+",
-                default=v
-            )
-        elif type(v) == bool:
-            parser.add_argument(
-                f"--{k}",
-                action="store_true" if not v else "store_false",
-            )
-        else:
-            parser.add_argument(
-                f"--{k}",
-                type=type(v),
-                default=v
-            )
-    return vars(parser.parse_args(override_args))
+        try:
+            if type(v) == list:
+                parser.add_argument(
+                    _build_key(k),
+                    type=type(v[0]) if len(v) > 0 else str,
+                    nargs="+",
+                    default=v
+                )
+            elif type(v) == bool:
+                parser.add_argument(
+                    _build_key(k),
+                    action="store_true" if not v else "store_false",
+                )
+            else:
+                parser.add_argument(
+                    _build_key(k),
+                    type=type(v),
+                    default=v
+                )
+        except argparse.ArgumentError:
+            logging.warn("Script defaults over-riding module arg %s.", k)
+            pass
+    return parser
 
 
 def _serialize_opt(opt):
@@ -216,6 +242,7 @@ def _deserialize_config(config):
 
 def _to_camel_case(string):
     return "".join([token.capitalize() for token in string.split("_")])
+
 
 def _to_underscore_case(string):
     return "_".join([token.lower() for token in re.findall("[A-Z][^A-Z]*", string)])
