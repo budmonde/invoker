@@ -178,11 +178,24 @@ class Workflow:
             arg_dict[script] = {}
         return arg_dict
 
+    @classmethod
+    def _generate_arg_list(cls, arg_dict):
+        out = []
+        for k, v in arg_dict.items():
+            out.append(f"--{k}")
+            if type(v) == list:
+                for item in v:
+                    out.append(str(item))
+            else:
+                out.append(str(v))
+        return out
+
     def run(self):
         for script in self.scripts():
             module = importlib.import_module(script)
             cls = getattr(module, _to_camel_case(script))
-            cls_inst = cls(self.arg_dict[script]).initialize()
+            arg_list = self._generate_arg_list(self.arg_dict[script])
+            cls_inst = cls(arg_list).initialize()
             cls_inst.run()
 
     def profile(self, top=10):
