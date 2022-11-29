@@ -75,6 +75,7 @@ class Module:
             conf = self.build_config(self.args)
         conf = self.build_config(inp_args)
         self.opt = _deserialize_config(conf)
+        self.initialize()
 
     @classmethod
     def args(cls):
@@ -83,6 +84,9 @@ class Module:
     @classmethod
     def build_config(cls, args):
         return args
+
+    def initialize(self):
+        pass
 
 
 class Script:
