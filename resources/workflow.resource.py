@@ -8,7 +8,7 @@ class __WORKFLOW__(Workflow):
         return {}
 
     @classmethod
-    def buid_script_args(cls, args):
+    def build_script_args(cls, args):
         # Args post-processing prior to passing them to each script
         arg_dict = {}
         for script in cls.scripts():
