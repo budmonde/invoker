@@ -178,8 +178,7 @@ class Workflow:
         for script in self.scripts():
             module = importlib.import_module(script)
             cls = getattr(module, _to_camel_case(script))
-            cls_inst = cls().initialize()
-            cls_inst.all_args = self.arg_dict[script]
+            cls_inst = cls(self.arg_dict[script]).initialize()
             cls_inst.run()
 
     def profile(self, top=10):
