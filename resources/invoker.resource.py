@@ -72,8 +72,9 @@ class Module:
     def __init__(self, inp_args=None):
         # Build Config
         if inp_args is None:
-            conf = self.build_config(self.args)
-        conf = self.build_config(inp_args)
+            conf = self.build_config(self.args())
+        else:
+            conf = self.build_config(inp_args)
         self.opt = _deserialize_config(conf)
         self.initialize()
 
