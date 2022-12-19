@@ -113,7 +113,7 @@ class Script:
             cls = importlib.import_module(module).get_class(module_mode)
             module_args = {
                 k.split(".")[1]: v
-                for k, v in self.all_args.items()
+                for k, v in conf.items()
                 if len(k.split(".")) == 2 and k.split(".")[0] == module
             }
             cls_inst = cls(module_args)
