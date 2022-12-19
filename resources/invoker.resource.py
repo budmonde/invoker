@@ -9,6 +9,8 @@ import pstats
 import re
 from pathlib import Path
 
+import torch
+
 
 def initialize_logger(fname):
     logfile_root = Path("./logs")
@@ -119,6 +121,9 @@ class Script:
             module_conf[module] = _serialize_opt(cls_inst.opt)
         conf.update(module_conf)
 
+        # Deserialize Options
+        self.opt = _deserialize_config(conf)
+
         # Save Config
         if "path" in conf:
             save_root = Path(conf["path"])
@@ -126,12 +131,10 @@ class Script:
             json.dump(
                 {
                     "modules": self.modules(),
-                    "config": conf,
+                    "config": _serialize_opt(self.opt),
                 },
                 open(save_root / "conf.json", "w"))
 
-        # Deserialize Options
-        self.opt = _deserialize_config(conf)
         return self
 
     @classmethod
@@ -243,6 +246,8 @@ def _serialize_opt(opt):
     for k, v in out.items():
         if isinstance(v, argparse.Namespace):
             out[k] = _serialize_opt(v)
+        elif isinstance(v, torch.device):
+            out[k] = str(v)
         else:
             out[k] = v
     return out
