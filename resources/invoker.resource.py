@@ -71,7 +71,7 @@ class InvokerFormatter(logging.Formatter):
 
 
 class Module:
-    def __init__(self, inp_args=None):
+    def __init__(self, inp_args=None, *args, **kwargs):
         # Build Config
         if inp_args is None:
             conf = self.build_config(self.args())
@@ -79,6 +79,7 @@ class Module:
             conf = self.build_config(inp_args)
         self.opt = _deserialize_config(conf)
         self.initialize()
+        super().__init__(*args, **kwargs)
 
     @classmethod
     def args(cls):

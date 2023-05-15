@@ -1,31 +1,39 @@
 #!/usr/bin/env python
+import logging
+
 from invoker import Script
 
 
 class __SCRIPT__(Script):
     @classmethod
     def args(cls):
-        # Specify arguments to pass from command line
-        return {}
+        args = super().args()
+        args.update({
+            # Specify arguments to pass from command line
+        })
+        return args
 
     @classmethod
     def modules(cls):
-        return {
+        mods = super().modules()
+        mods.update({
             # Add module dependencies
             # "module": "mode"
-        }
+        })
+        return mods
 
     @classmethod
     def build_config(cls, args):
         # Args post-processing prior to script main exec
-        args.update({
+        configs = super().build_config(args)
+        configs.update({
             # Add path keyword to store output
             # "path": "./io/output_path",
         })
-        return args
+        return configs
 
     def run(self):
-        # Main logic here
+        logging.info("Running script __SCRIPT__")
         pass
 
 
