@@ -8,28 +8,28 @@ class __SCRIPT__(Script):
     @classmethod
     def args(cls):
         args = super().args()
-        args.update({
+        args.update(dict(
             # Specify arguments to pass from command line
-        })
+        ))
         return args
 
     @classmethod
     def modules(cls):
         mods = super().modules()
-        mods.update({
+        mods.update(dict(
             # Add module dependencies
-            # "module": "mode"
-        })
+            # module="mode"
+        ))
         return mods
 
     @classmethod
     def build_config(cls, args):
         # Args post-processing prior to script main exec
         configs = super().build_config(args)
-        configs.update({
+        configs.update(dict(
             # Add path keyword to store output
-            # "path": "./io/output_path",
-        })
+            # path="./io/output_path",
+        ))
         return configs
 
     def run(self):
