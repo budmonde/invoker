@@ -1,6 +1,7 @@
 import importlib
 import importlib.resources
 import inspect
+from pathlib import Path
 
 
 # Import all module classes
@@ -10,9 +11,9 @@ _CLASSES = {
     for list_of_classes in [
         inspect.getmembers(module, inspect.isclass)
         for module in [
-            importlib.import_module(f"{__package__}.{fname.rstrip('.py')}")
+            importlib.import_module(f"{__package__}.{Path(fname).stem}")
             for fname in importlib.resources.contents(__package__)
-            if fname.endswith(".py") and fname != "__init__.py"
+            if Path(fname).suffix == ".py" and fname != "__init__.py"
         ]
     ]
     for name, cls in list_of_classes
