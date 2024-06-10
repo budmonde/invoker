@@ -74,18 +74,3 @@ def script(script_name):
     except InvokerError as err:
         click.secho("Invoker Error: ", err=True, nl=False, fg="red")
         click.echo(err, err=True)
-
-
-@create.command()
-@click.argument("workflow_name")
-def workflow(workflow_name):
-    click.secho(f"Creating new workflow {workflow_name}...", fg="yellow")
-    project = Project(Path())
-    try:
-        project.load()
-        project.create_workflow(workflow_name)
-        project.validate()
-        click.secho("Success!", fg="green")
-    except InvokerError as err:
-        click.secho("Invoker Error: ", err=True, nl=False, fg="red")
-        click.echo(err, err=True)

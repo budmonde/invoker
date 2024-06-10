@@ -5,6 +5,8 @@ import importlib
 import json
 import logging
 import logging.config
+import os
+import pprint
 import pstats
 import re
 from pathlib import Path
@@ -45,7 +47,7 @@ def initialize_logger(fname):
             }
         },
         "root": {
-            "level": "INFO",
+            "level": os.getenv("INVOKER_LOGLEVEL", "INFO"),
             "handlers": ["console", "file"]
         }
     }
@@ -94,20 +96,21 @@ class Module:
 
 
 class Script:
-    def __init__(self, inp_args=None):
-        self.inp_args = inp_args
-        # Initialize logger
-        initialize_logger(_to_underscore_case(type(self).__name__))
+    def __init__(self, inp_args_dict=None, is_root_script=True):
+        if is_root_script:
+            initialize_logger(_to_underscore_case(type(self).__name__))
 
-        # Parse Arguments
         parser = _build_argparser(self.args())
         for module, module_mode in self.modules().items():
             cls = importlib.import_module(module).get_class(module_mode)
             parser = _build_argparser(cls.args(), module, parser)
-        self.all_args = vars(parser.parse_args(self.inp_args))
+
+        if inp_args_dict is None:
+            self.all_args = vars(parser.parse_args())
+        else:
+            self.all_args = _parse_args_dict(inp_args_dict, parser)
 
     def initialize(self):
-        # Build Config
         conf = self.build_config(self.all_args.copy())
         module_conf = {}
         for module, module_mode in self.modules().items():
@@ -121,21 +124,9 @@ class Script:
             setattr(self, module, cls_inst)
             module_conf[module] = _serialize_opt(cls_inst.opt)
         conf.update(module_conf)
-
-        # Deserialize Options
         self.opt = _deserialize_config(conf)
 
-        # Save Config
-        if "path" in conf:
-            save_root = Path(conf["path"])
-            save_root.mkdir(parents=True, exist_ok=True)
-            json.dump(
-                {
-                    "modules": self.modules(),
-                    "config": _serialize_opt(self.opt),
-                },
-                open(save_root / "conf.json", "w"))
-
+        logging.info("Initialized script %s with options:\n%s", type(self).__name__, pprint.pformat(conf, sort_dicts=False))
         return self
 
     @classmethod
@@ -151,6 +142,7 @@ class Script:
         return args
 
     def run(self):
+        logging.info("Running script %s", type(self).__name__)
         pass
 
     def profile(self, top=10):
@@ -162,77 +154,30 @@ class Script:
         stats.print_stats(top)
 
 
-class Workflow:
-    def __init__(self):
-        parser = _build_argparser(self.args())
-        all_args = vars(parser.parse_args())
-        self.arg_dict = self.build_script_args(all_args)
+def _build_key(kname: str, key_prefix: str =None) -> str:
+    return f"--{kname}" if key_prefix is None else f"--{key_prefix}.{kname}"
 
-    @classmethod
-    def args(cls):
-        return {}
-
-    @classmethod
-    def scripts(cls):
-        return []
-
-    @classmethod
-    def build_script_args(cls, args):
-        arg_dict = {}
-        for script in cls.scripts():
-            arg_dict[script] = {}
-        return arg_dict
-
-    @classmethod
-    def _generate_arg_list(cls, arg_dict):
-        out = []
-        for k, v in arg_dict.items():
-            out.append(f"--{k}")
-            if type(v) == list:
-                for item in v:
-                    out.append(str(item))
-            else:
-                out.append(str(v))
-        return out
-
-    def run(self):
-        for script in self.scripts():
-            module = importlib.import_module(script)
-            cls = getattr(module, _to_camel_case(script))
-            arg_list = self._generate_arg_list(self.arg_dict[script])
-            cls_inst = cls(arg_list).initialize()
-            cls_inst.run()
-
-    def profile(self, top=10):
-        prof = profile.Profile()
-        prof.enable()
-        self.run()
-        prof.disable()
-        stats = pstats.Stats(prof).strip_dirs().sort_stats("cumtime")
-        stats.print_stats(top)
 
 def _build_argparser(default_args, key_prefix=None, parser=None):
     if parser is None:
         parser = argparse.ArgumentParser()
-    def _build_key(kname):
-        return f"--{kname}" if key_prefix is None else f"--{key_prefix}.{kname}"
     for k, v in default_args.items():
         try:
             if type(v) == list:
                 parser.add_argument(
-                    _build_key(k),
+                    _build_key(k, key_prefix),
                     type=type(v[0]) if len(v) > 0 else str,
                     nargs="+",
                     default=v
                 )
             elif type(v) == bool:
                 parser.add_argument(
-                    _build_key(k),
+                    _build_key(k, key_prefix),
                     action="store_true" if not v else "store_false",
                 )
             else:
                 parser.add_argument(
-                    _build_key(k),
+                    _build_key(k, key_prefix),
                     type=type(v),
                     default=v
                 )
@@ -240,6 +185,22 @@ def _build_argparser(default_args, key_prefix=None, parser=None):
             logging.warn("Script defaults over-riding module arg %s.", k)
             pass
     return parser
+
+
+def _parse_args_dict(args_dict: dict, parser: argparse.ArgumentParser, key_prefix: str =None) -> list[str]:
+    cmd_args = []
+    for k, v in args_dict.items():
+        if type(v) == list:
+            cmd_args.append(_build_key(k, key_prefix))
+            for item in v:
+                cmd_args.append(str(item))
+        elif type(v) == bool:
+            if v != parser.get_default(k):
+                cmd_args.append(_build_key(k, key_prefix))
+        else:
+            cmd_args.append(_build_key(k, key_prefix))
+            cmd_args.append(str(v))
+    return vars(parser.parse_args(cmd_args))
 
 
 def _serialize_opt(opt):
