@@ -3,7 +3,6 @@ import importlib.resources
 import inspect
 from pathlib import Path
 
-
 # Import all module classes
 _PACKAGE_NAME = "".join([token.capitalize() for token in __package__.split("_")])
 _CLASSES = {

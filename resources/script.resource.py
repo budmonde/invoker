@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-import logging
-
 from invoker import Script
 
 
@@ -33,8 +31,6 @@ class __SCRIPT__(Script):
         return configs
 
     def run(self):
-        logging.info("Running script __SCRIPT__")
-        pass
 
 
 if __name__ == "__main__":

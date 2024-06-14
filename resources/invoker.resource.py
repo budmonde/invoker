@@ -2,7 +2,6 @@ import argparse
 import copy
 import cProfile as profile
 import importlib
-import json
 import logging
 import logging.config
 import os
@@ -67,7 +66,7 @@ class InvokerFormatter(logging.Formatter):
     RESET = "\x1b[0m"
 
     def format(self, record):
-        out = super().format(record)
+        super().format(record)
         color = self.LVL2COLOR.get(record.levelno)
         return color + logging.Formatter.format(self, record) + self.RESET
 
