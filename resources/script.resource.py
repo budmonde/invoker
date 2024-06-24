@@ -31,6 +31,8 @@ class __SCRIPT__(Script):
         return configs
 
     def run(self):
+        super().run()
+        pass
 
 
 if __name__ == "__main__":
