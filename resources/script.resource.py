@@ -36,4 +36,4 @@ class __SCRIPT__(Script):
 
 
 if __name__ == "__main__":
-    __SCRIPT__().initialize().run()
+    __SCRIPT__(run_as_root_script=True).run()

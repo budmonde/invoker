@@ -10,123 +10,53 @@ import pstats
 import re
 from pathlib import Path
 
-import torch
-
-
-def initialize_logger(fname):
-    logfile_root = Path("./logs")
-    logfile_root.mkdir(exist_ok=True, parents=True)
-    logfile_path = logfile_root / f"{fname}.log"
-    do_rollover = True if logfile_path.exists() else False
-    logger_dict = {
-        "version": 1,
-        "formatters": {
-            "verbose": {
-                "format": "%(asctime)s,%(msecs)d [%(levelname)-8s] %(filename)s:%(lineno)d.%(funcName)s() %(message)s",
-                "datefmt": "%Y-%m-%d %H:%M:%S",
-            },
-            "pretty": {
-                "format": "%(asctime)s [%(levelname)-8s] %(filename)s:%(lineno)d.%(funcName)s() %(message)s",
-                "datefmt": "%H:%M:%S",
-                "class": "invoker.InvokerFormatter",
-            },
-        },
-        "handlers": {
-            "console": {
-                "class": "logging.StreamHandler",
-                "formatter": "pretty",
-                "stream": "ext://sys.stdout"
-            },
-            "file": {
-                "class": "logging.handlers.RotatingFileHandler",
-                "formatter": "verbose",
-                "filename": logfile_path,
-                "maxBytes": 1048576,  # 1MB
-                "backupCount": 20,
-            }
-        },
-        "root": {
-            "level": os.getenv("INVOKER_LOGLEVEL", "INFO"),
-            "handlers": ["console", "file"]
-        }
-    }
-    logging.config.dictConfig(logger_dict)
-    if do_rollover:
-        logging.getLogger("root").handlers[1].doRollover()
-
-
-class InvokerFormatter(logging.Formatter):
-    LVL2COLOR = {
-        logging.DEBUG: "\x1b[38m", #  grey
-        logging.INFO: "\x1b[36m", #  blue
-        logging.WARNING: "\x1b[33m", #  yellow
-        logging.ERROR: "\x1b[31m", #  red
-        logging.CRITICAL: "\x1b[31;1m", #  bold_red
-    }
-    RESET = "\x1b[0m"
-
-    def format(self, record):
-        super().format(record)
-        color = self.LVL2COLOR.get(record.levelno)
-        return color + logging.Formatter.format(self, record) + self.RESET
-
-
-class Module:
-    def __init__(self, inp_args=None, *args, **kwargs):
-        # Build Config
-        if inp_args is None:
-            conf = self.build_config(self.args())
-        else:
-            conf = self.build_config(inp_args)
-        self.opt = _deserialize_config(conf)
-        self.initialize()
-        super().__init__(*args, **kwargs)
-
-    @classmethod
-    def args(cls):
-        return {}
-
-    @classmethod
-    def build_config(cls, args):
-        return args
-
-    def initialize(self):
-        pass
-
 
 class Script:
-    def __init__(self, inp_args_dict=None, is_root_script=True):
-        if is_root_script:
-            initialize_logger(_to_underscore_case(type(self).__name__))
+    """
+        @inp_args_dict     : keyword argument overrides to default values of self.args()
+        @args_list         : argv list passed into argparse. If left none, argv from command line used directly
+        @run_as_root_script: run script as the entry point of the program
+        @log_to_console    : whether to emit logs to console or not
+        @logfile_root      : root path to logfiles
+    """
+    def __init__(
+            self,
+            inp_args_dict = None,
+            args_list = None,
+            run_as_root_script: bool = False,
+            log_to_console: bool = True,
+            logfile_root: str = None,
+    ):
+        if run_as_root_script:
+            _initialize_logger(log_to_console, logfile_root, _to_underscore_case(type(self).__name__))
 
         parser = _build_argparser(self.args())
-        for module, module_mode in self.modules().items():
-            cls = importlib.import_module(module).get_class(module_mode)
-            parser = _build_argparser(cls.args(), module, parser)
+        for module_name, module_mode in self.modules().items():
+            cls = importlib.import_module(module_name).get_class(module_mode)
+            parser = _build_argparser(cls.args(), module_name, parser)
 
         if inp_args_dict is None:
-            self.all_args = vars(parser.parse_args())
+            all_args = vars(parser.parse_args(args_list))
         else:
-            self.all_args = _parse_args_dict(inp_args_dict, parser)
+            all_args = _parse_args_dict(inp_args_dict, parser)
 
-    def initialize(self):
-        conf = self.build_config(self.all_args.copy())
+        conf = self.build_config(all_args.copy())
+
         module_conf = {}
-        for module, module_mode in self.modules().items():
-            cls = importlib.import_module(module).get_class(module_mode)
+        for module_name, module_mode in self.modules().items():
+            cls = importlib.import_module(module_name).get_class(module_mode)
             module_args = {
                 k.split(".")[1]: v
                 for k, v in conf.items()
-                if len(k.split(".")) == 2 and k.split(".")[0] == module
+                if len(k.split(".")) == 2 and k.split(".")[0] == module_name
             }
             cls_inst = cls(module_args)
-            setattr(self, module, cls_inst)
-            module_conf[module] = _serialize_opt(cls_inst.opt)
+            setattr(self, module_name, cls_inst)
+            module_conf[module_name] = _serialize_opt(cls_inst.opt)
         conf.update(module_conf)
         self.opt = _deserialize_config(conf)
 
         logging.info("Initialized script %s with options:\n%s", type(self).__name__, pprint.pformat(conf, sort_dicts=False))
-        return self
 
     @classmethod
     def args(cls):
@@ -151,6 +81,89 @@ class Script:
         prof.disable()
         stats = pstats.Stats(prof).strip_dirs().sort_stats("cumtime")
         stats.print_stats(top)
+
+
+class Module:
+    def __init__(self, inp_args=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Build Config
+        if inp_args is None:
+            conf = self.build_config(self.args())
+        else:
+            conf = self.build_config(inp_args)
+        self.opt = _deserialize_config(conf)
+
+    @classmethod
+    def args(cls):
+        return {}
+
+    @classmethod
+    def build_config(cls, args):
+        return args
+
+
+class InvokerFormatter(logging.Formatter):
+    LVL2COLOR = {
+        logging.DEBUG: "\x1b[38m", #  grey
+        logging.INFO: "\x1b[36m", #  blue
+        logging.WARNING: "\x1b[33m", #  yellow
+        logging.ERROR: "\x1b[31m", #  red
+        logging.CRITICAL: "\x1b[31;1m", #  bold_red
+    }
+    RESET = "\x1b[0m"
+
+    def format(self, record):
+        super().format(record)
+        color = self.LVL2COLOR.get(record.levelno)
+        return color + logging.Formatter.format(self, record) + self.RESET
+
+
+def _initialize_logger(log_to_console, logfile_root, logfile_name):
+    logger_dict = {
+        "version": 1,
+        "formatters": {},
+        "handlers": {},
+        "root": {
+            "level": os.getenv("INVOKER_LOGLEVEL", "INFO"),
+            "handlers": []
+        }
+    }
+
+    if log_to_console:
+        logger_dict["formatters"]["pretty"] = {
+            "format": "%(asctime)s [%(levelname)-8s] %(filename)s:%(lineno)d.%(funcName)s() %(message)s",
+            "datefmt": "%H:%M:%S",
+            "class": "invoker.InvokerFormatter",
+        }
+        logger_dict["handlers"]["console"] = {
+            "class": "logging.StreamHandler",
+            "formatter": "pretty",
+            "stream": "ext://sys.stdout"
+        }
+        logger_dict["root"]["handlers"].append("console")
+
+    if logfile_root is not None:
+        logfile_root = Path(logfile_root)
+        logfile_root.mkdir(exist_ok=True, parents=True)
+        logfile_path = logfile_root / f"{logfile_name}.log"
+        do_rollover = True if logfile_path.exists() else False
+        logger_dict["formatters"]["verbose"] = {
+            "format": "%(asctime)s,%(msecs)d [%(levelname)-8s] %(filename)s:%(lineno)d.%(funcName)s() %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+        }
+        logger_dict["handlers"]["file"] = {
+            "class": "logging.handlers.RotatingFileHandler",
+            "formatter": "verbose",
+            "filename": logfile_path,
+            "maxBytes": 1048576,  # 1MB
+            "backupCount": 20,
+        }
+        logger_dict["root"]["handlers"].append("file")
+
+    logging.config.dictConfig(logger_dict)
+
+    if (logfile_root is not None) and do_rollover:
+        logging.getLogger("root").handlers[1].doRollover()
 
 
 def _build_key(kname: str, key_prefix: str =None) -> str:
@@ -207,8 +220,6 @@ def _serialize_opt(opt):
     for k, v in out.items():
         if isinstance(v, argparse.Namespace):
             out[k] = _serialize_opt(v)
-        elif isinstance(v, torch.device):
-            out[k] = str(v)
         else:
             out[k] = v
     return out
