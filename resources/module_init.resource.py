@@ -4,7 +4,7 @@ import inspect
 from pathlib import Path
 
 # Import all module classes
-_PACKAGE_NAME = "".join([token.capitalize() for token in __package__.split("_")])
+_MODULE_NAME = "".join([token.capitalize() for token in __package__.split(".")[-1].split("_")])
 _CLASSES = {
     name: cls
     for list_of_classes in [
@@ -16,14 +16,14 @@ _CLASSES = {
         ]
     ]
     for name, cls in list_of_classes
-    if name.endswith(_PACKAGE_NAME)
+    if name.endswith(_MODULE_NAME)
 }
 
 
 def get_class(mode):
     cls_name = (
         "".join([token.capitalize() for token in mode.split("_")])
-        + _PACKAGE_NAME
+        + _MODULE_NAME
     )
     if cls_name not in _CLASSES.keys():
         raise TypeError(f"Invalid {__package__} mode: {cls_name}")

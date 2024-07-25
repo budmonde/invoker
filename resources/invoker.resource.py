@@ -13,15 +13,15 @@ from pathlib import Path
 
 class Script:
     """
-        @inp_args_dict     : keyword argument overrides to default values of self.args()
-        @args_list         : argv list passed into argparse. If left none, argv from command line used directly
+        @args_dict         : keyword argument overrides to default values of self.args()
+        @args_list         : argv list passed into argparse. args_dict takes priority
         @run_as_root_script: run script as the entry point of the program
         @log_to_console    : whether to emit logs to console or not
         @logfile_root      : root path to logfiles
     """
     def __init__(
             self,
-            inp_args_dict = None,
+            args_dict = None,
             args_list = None,
             run_as_root_script: bool = False,
             log_to_console: bool = True,
@@ -30,33 +30,35 @@ class Script:
         if run_as_root_script:
             _initialize_logger(log_to_console, logfile_root, _to_underscore_case(type(self).__name__))
 
-        parser = _build_argparser(self.args())
+        parser_manager = ParserManager()
+        parser_manager.add_arguments(self.args())
         for module_name, module_mode in self.modules().items():
-            cls = importlib.import_module(module_name).get_class(module_mode)
-            parser = _build_argparser(cls.args(), module_name, parser)
-
-        if inp_args_dict is None:
-            all_args = vars(parser.parse_args(args_list))
-        else:
-            all_args = _parse_args_dict(inp_args_dict, parser)
-
-        conf = self.build_config(all_args.copy())
+            cls = _load_class(module_name, module_mode)
+            parser_manager.add_arguments(cls.args(), key_prefix = module_name)
+        script_config = self.build_config(parser_manager.parse_args(args_dict, args_list))
 
         module_conf = {}
         for module_name, module_mode in self.modules().items():
-            cls = importlib.import_module(module_name).get_class(module_mode)
+            cls = _load_class(module_name, module_mode)
+
+            is_valid_module_conf = lambda key: len(key.split(".")) == 2
+            module_conf_matches_module = lambda key: key.split(".")[0] == module_name
+            get_module_conf_key = lambda key: key.split(".")[1]
             module_args = {
-                k.split(".")[1]: v
-                for k, v in conf.items()
-                if len(k.split(".")) == 2 and k.split(".")[0] == module_name
+                get_module_conf_key(key) : value
+                for key, value in script_config.items()
+                if is_valid_module_conf(key) and module_conf_matches_module(key)
             }
+
             cls_inst = cls(module_args)
             setattr(self, module_name, cls_inst)
             module_conf[module_name] = _serialize_opt(cls_inst.opt)
-        conf.update(module_conf)
-        self.opt = _deserialize_config(conf)
+            for module_arg in module_args.keys():
+                del script_config[".".join([module_name, module_arg])]
+        script_config.update(module_conf)
+        self.opt = _deserialize_config(script_config)
 
-        logging.info("Initialized script %s with options:\n%s", type(self).__name__, pprint.pformat(conf, sort_dicts=False))
+        logging.info("Initialized script %s with options:\n%s", type(self).__name__, pprint.pformat(script_config, sort_dicts=False))
 
     @classmethod
     def args(cls):
@@ -75,6 +77,7 @@ class Script:
         pass
 
     def profile(self, top=10):
+        logging.info("Profiling script %s", type(self).__name__)
         prof = profile.Profile()
         prof.enable()
         self.run()
@@ -83,39 +86,12 @@ class Script:
         stats.print_stats(top)
 
 
-class Module:
-    def __init__(self, inp_args=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Build Config
-        if inp_args is None:
-            conf = self.build_config(self.args())
-        else:
-            conf = self.build_config(inp_args)
-        self.opt = _deserialize_config(conf)
-
-    @classmethod
-    def args(cls):
-        return {}
-
-    @classmethod
-    def build_config(cls, args):
-        return args
+def _to_underscore_case(string):
+    return "_".join([token.lower() for token in re.findall("[A-Z][^A-Z]*", string)])
 
 
-class InvokerFormatter(logging.Formatter):
-    LVL2COLOR = {
-        logging.DEBUG: "\x1b[38m", #  grey
-        logging.INFO: "\x1b[36m", #  blue
-        logging.WARNING: "\x1b[33m", #  yellow
-        logging.ERROR: "\x1b[31m", #  red
-        logging.CRITICAL: "\x1b[31;1m", #  bold_red
-    }
-    RESET = "\x1b[0m"
-
-    def format(self, record):
-        super().format(record)
-        color = self.LVL2COLOR.get(record.levelno)
-        return color + logging.Formatter.format(self, record) + self.RESET
+def _to_camel_case(string):
+    return "".join([token.capitalize() for token in string.split("_")])
 
 
 def _initialize_logger(log_to_console, logfile_root, logfile_name):
@@ -133,7 +109,7 @@ def _initialize_logger(log_to_console, logfile_root, logfile_name):
         logger_dict["formatters"]["pretty"] = {
             "format": "%(asctime)s [%(levelname)-8s] %(filename)s:%(lineno)d.%(funcName)s() %(message)s",
             "datefmt": "%H:%M:%S",
-            "class": "invoker.InvokerFormatter",
+            "class": "invoker.InvokerFormatter" if __package__ == "" else ".".join([__package__, "invoker.InvokerFormatter"]),
         }
         logger_dict["handlers"]["console"] = {
             "class": "logging.StreamHandler",
@@ -166,53 +142,100 @@ def _initialize_logger(log_to_console, logfile_root, logfile_name):
         logging.getLogger("root").handlers[1].doRollover()
 
 
+class InvokerFormatter(logging.Formatter):
+    LVL2COLOR = {
+        logging.DEBUG: "\x1b[38m", #  grey
+        logging.INFO: "\x1b[36m", #  blue
+        logging.WARNING: "\x1b[33m", #  yellow
+        logging.ERROR: "\x1b[31m", #  red
+        logging.CRITICAL: "\x1b[31;1m", #  bold_red
+    }
+    RESET = "\x1b[0m"
+
+    def format(self, record):
+        super().format(record)
+        color = self.LVL2COLOR.get(record.levelno)
+        return color + logging.Formatter.format(self, record) + self.RESET
+
+
+class ParserManager:
+    def __init__(self):
+        super().__init__()
+        self.parser = argparse.ArgumentParser()
+
+    def add_arguments(self, default_args, key_prefix=None):
+        for k, v in default_args.items():
+            try:
+                if type(v) == list:
+                    self.parser.add_argument(
+                        _build_key(k, key_prefix),
+                        type=type(v[0]) if len(v) > 0 else str,
+                        nargs="+",
+                        default=v
+                    )
+                elif type(v) == bool:
+                    self.parser.add_argument(
+                        _build_key(k, key_prefix),
+                        action="store_true" if not v else "store_false",
+                    )
+                else:
+                    self.parser.add_argument(
+                        _build_key(k, key_prefix),
+                        type=type(v),
+                        default=v
+                    )
+            except argparse.ArgumentError:
+                logging.warn("Script defaults over-riding module arg %s.", k)
+
+    def parse_args(self, args_dict, fallback_args_list, key_prefix=None):
+        if args_dict is not None:
+            args_list = []
+            for k, v in args_dict.items():
+                if type(v) == list:
+                    args_list.append(_build_key(k, key_prefix))
+                    for item in v:
+                        args_list.append(str(item))
+                elif type(v) == bool:
+                    if v != self.parser.get_default(k):
+                        args_list.append(_build_key(k, key_prefix))
+                else:
+                    args_list.append(_build_key(k, key_prefix))
+                    args_list.append(str(v))
+            return self._parse_args(args_list)
+        elif fallback_args_list is not None:
+            return self._parse_args(fallback_args_list)
+        else:
+            return self._parse_args()
+
+    def _parse_args(self, args_list):
+        return vars(self.parser.parse_args(args_list))
+
+
 def _build_key(kname: str, key_prefix: str =None) -> str:
     return f"--{kname}" if key_prefix is None else f"--{key_prefix}.{kname}"
 
 
-def _build_argparser(default_args, key_prefix=None, parser=None):
-    if parser is None:
-        parser = argparse.ArgumentParser()
-    for k, v in default_args.items():
-        try:
-            if type(v) == list:
-                parser.add_argument(
-                    _build_key(k, key_prefix),
-                    type=type(v[0]) if len(v) > 0 else str,
-                    nargs="+",
-                    default=v
-                )
-            elif type(v) == bool:
-                parser.add_argument(
-                    _build_key(k, key_prefix),
-                    action="store_true" if not v else "store_false",
-                )
-            else:
-                parser.add_argument(
-                    _build_key(k, key_prefix),
-                    type=type(v),
-                    default=v
-                )
-        except argparse.ArgumentError:
-            logging.warn("Script defaults over-riding module arg %s.", k)
-            pass
-    return parser
+def _load_class(module_name, module_mode):
+    module_full_name = module_name if __package__ == "" else ".".join([__package__, module_name])
+    return importlib.import_module(module_full_name).get_class(module_mode)
 
 
-def _parse_args_dict(args_dict: dict, parser: argparse.ArgumentParser, key_prefix: str =None) -> list[str]:
-    cmd_args = []
-    for k, v in args_dict.items():
-        if type(v) == list:
-            cmd_args.append(_build_key(k, key_prefix))
-            for item in v:
-                cmd_args.append(str(item))
-        elif type(v) == bool:
-            if v != parser.get_default(k):
-                cmd_args.append(_build_key(k, key_prefix))
+class Module:
+    def __init__(self, args_dict=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if args_dict is not None:
+            conf = self.build_config(args_dict)
         else:
-            cmd_args.append(_build_key(k, key_prefix))
-            cmd_args.append(str(v))
-    return vars(parser.parse_args(cmd_args))
+            conf = self.build_config(self.args())
+        self.opt = _deserialize_config(conf)
+
+    @classmethod
+    def args(cls):
+        return {}
+
+    @classmethod
+    def build_config(cls, args):
+        return args
 
 
 def _serialize_opt(opt):
@@ -233,11 +256,3 @@ def _deserialize_config(config):
         else:
             setattr(opt, k, v)
     return opt
-
-
-def _to_camel_case(string):
-    return "".join([token.capitalize() for token in string.split("_")])
-
-
-def _to_underscore_case(string):
-    return "_".join([token.lower() for token in re.findall("[A-Z][^A-Z]*", string)])
