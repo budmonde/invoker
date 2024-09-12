@@ -205,7 +205,7 @@ class ParserManager:
         elif fallback_args_list is not None:
             return self._parse_args(fallback_args_list)
         else:
-            return self._parse_args()
+            return self._parse_args(None)
 
     def _parse_args(self, args_list):
         return vars(self.parser.parse_args(args_list))
