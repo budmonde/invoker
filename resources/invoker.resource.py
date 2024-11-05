@@ -1,3 +1,37 @@
+"""Invoker Python Project Manager
+
+This script enables bootstrappable python script authoring that are easy to configure with command line arguments, interactive debugging, profiling, logging infrastructure, and dynamic module loading. To create a bootstrapped script, inherit from the "Script" class and implement the run() function. For example:
+
+```
+import logging
+
+from invoker import Script
+
+
+class MyScript(Script):
+    @classmethod
+    def args(cls):
+        args = super().args()
+        args.update(dict(key = "default_value"))
+        return args
+
+    def run(self):
+        super().run()
+        logging.info(f'Hello World! You've passed {self.opt.key} from the command line.')
+```
+
+To run the script, run
+```
+python invoker.py run my_script.py --key custom_value
+```
+
+To enter an interactive ipython session at a specific line within the script, run
+```
+python invoker.py debug my_script.py:14
+```
+
+Invoker projects can also be managed using a python CLI tool. For more information, see https://github.com/budmonde/invoker
+"""
 import argparse
 import copy
 import cProfile as profile
@@ -12,8 +46,6 @@ import pstats
 import re
 import sys
 from pathlib import Path
-
-from IPython.terminal.embed import InteractiveShellEmbed
 
 
 class Script:
@@ -91,6 +123,7 @@ class Script:
         stats.print_stats(top)
 
     def embed(self):
+        from IPython.terminal.embed import InteractiveShellEmbed
         caller_frame = inspect.currentframe().f_back
         module = get_module(caller_frame.f_globals["__file__"])
         shell = InteractiveShellEmbed(user_module=module)
@@ -282,12 +315,11 @@ def get_module(file_name):
     return module
 
 
-def get_embed_instrumented_module(file_name, embed_line_num):
+def get_embed_instrumented_module(file_name, instrument_line_num, instrument_line):
     with open(file_name, "r") as fp:
         lines = fp.readlines()
 
     script_class_name = _to_camel_case(file_name.replace(".py", ""))
-
     try:
         script_line_number = next(
             i for i, line in enumerate(lines)
@@ -298,7 +330,8 @@ def get_embed_instrumented_module(file_name, embed_line_num):
 
     get_indent = lambda line: len(line) - len(line.lstrip())
 
-    if embed_line_num is None:
+    valid_instrument_line = instrument_line_num is not None and instrument_line_num < len(lines)
+    if not valid_instrument_line:
         in_run = False
         for index in range(script_line_number, len(lines) - 1):
             line = lines[index]
@@ -307,18 +340,18 @@ def get_embed_instrumented_module(file_name, embed_line_num):
                 indent_size = get_indent(line) + 4
             elif in_run:
                 if len(line.strip()) > 0 and get_indent(line) < (indent_size or 0):
-                    embed_line_num = index - 1
+                    instrument_line_num = index - 1
                     break
-        if embed_line_num is None:
-            embed_line_num = len(lines) - 1
+        if not valid_instrument_line:
+            instrument_line_num = len(lines) - 1
     else:
-        indent_size = get_indent(lines[embed_line_num - 1])
+        indent_size = get_indent(lines[instrument_line_num - 1])
 
-    embed_line = " " * indent_size + "self.embed()\n"
+    instrument_line = " " * indent_size + f"{instrument_line}\n"
 
     new_lines = list(lines)
-    new_lines.insert(embed_line_num + 1, embed_line)
-    new_file = file_name.replace(".py", "_insert_embed.py")
+    new_lines.insert(instrument_line_num, instrument_line)
+    new_file = file_name.replace(".py", "_instrumented.py")
 
     with open(new_file, "w") as fp:
         fp.writelines(new_lines)
@@ -330,11 +363,11 @@ def get_embed_instrumented_module(file_name, embed_line_num):
     return module
 
 
-def get_script(file_name, embed=False, embed_line_num=None):
-    if not embed:
+def get_script(file_name, instrument=False, instrument_line_num=None, instrument_line="exit()"):
+    if not instrument:
         module = get_module(file_name)
     else:
-        module = get_embed_instrumented_module(file_name, embed_line_num)
+        module = get_embed_instrumented_module(file_name, instrument_line_num, instrument_line)
     class_name = _to_camel_case(file_name.replace(os.sep, ".").replace(".py", ""))
     script = getattr(module, class_name)
     return script
@@ -342,26 +375,28 @@ def get_script(file_name, embed=False, embed_line_num=None):
 
 if __name__ == "__main__":
     _initialize_logger(True, None, "invoker")
-    argv = sys.argv.copy()[1:]
 
-    if len(argv) < 1:
-        raise RuntimeError("Must run invoker.py script with a command (e.g., invoker.py run <script_name).")
-    command = argv.pop(0)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("command", choices = ["run", "debug"], type=str, help="Invoker script command.")
+    parser.add_argument("script_name", type=str, help="Target invoker script name. Optionally include line number to run until as <script_name>:<line_numbrer>")
 
-    if command == "run":
-        if len(argv) < 1:
-            raise RuntimeError("Must specify script to run (e.g., invoker.py run <script_name>)")
-        script_name = argv.pop(0)
-        script = get_script(script_name)
-        script(args_list = argv).run()
+    if (len(sys.argv) < 3):
+        parser.print_help(sys.stderr)
+        exit()
 
-    if command == "debug":
-        if len(argv) < 1:
-            raise RuntimeError("Must specify script to debug (e.g., invoker.py debug <script_name>)")
-        script_match = re.match(r"^(\w+\.\w+)(?::(\d+))?$", argv.pop(0))
-        if not script_match:
-            raise RuntimeError("Invalid script name + line number.")
-        script_name = script_match.group(1)
-        embed_line_num = int(script_match.group(2)) if script_match.group(2) else None
-        script = get_script(script_name, embed = True, embed_line_num = embed_line_num)
-        script(args_list = argv).run()
+    args = parser.parse_args(sys.argv[1:3])
+    script_match = re.match(r"^(\w+\.\w+)(?::(\d+))?$", args.script_name)
+    if not script_match:
+        logging.error("Invalid script name: %s.", args.script_name)
+        exit()
+    script_name = script_match.group(1)
+    instrument_line_num = int(script_match.group(2)) if script_match.group(2) else None
+
+    if args.command == "run":
+        script = get_script(script_name, instrument = instrument_line_num is not None, instrument_line_num = instrument_line_num, instrument_line = "exit()")
+    elif args.command == "debug":
+        script = get_script(script_name, instrument = True, instrument_line_num = instrument_line_num, instrument_line = "self.embed()")
+    else:
+        logging.error("Invalid command: %s.", args.command)
+
+    script(args_list = sys.argv[3:], run_as_root_script=True).run()

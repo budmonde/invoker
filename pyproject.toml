@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "invoker"
 version = "0.2.0"
-dependencies = ["Click"]
+dependencies = ["Click", "ipython"]
 
 [project.scripts]
 invoker = "invoker:cli"
