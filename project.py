@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import subprocess
 
 from util import copy_resource, compute_resource_hash, compute_file_hash, to_camel_case
@@ -65,6 +66,25 @@ class Project:
             preprocess_fn=lambda l: l.replace("__SCRIPT__", to_camel_case(script_name)),
         )
         script_path.chmod(0o744)
+
+    def run_script(self, script_name):
+        # Fix script name
+        if not script_name.endswith(".py"):
+            script_name = script_name + ".py"
+        script_path = self.root_path / f"{script_name}"
+        if not script_path.exists():
+            raise InvokerError(f"script does not exist at {script_path}.")
+        subprocess.call(['python', 'invoker.py', 'run', script_name])
+
+    def debug_script(self, script_name_with_line_num):
+        script_match = re.match(r"^(\w+\.\w+)(?::(\d+))?$", script_name_with_line_num)
+        script_name = script_match.group(1)
+        embed_line_num = int(script_match.group(2)) if script_match.group(2) else None
+
+        script_path = self.root_path / f"{script_name}"
+        if not script_path.exists():
+            raise InvokerError(f"script does not exist at {script_path}.")
+        subprocess.call(['python', 'invoker.py', 'debug', script_name_with_line_num])
 
     def create_workflow(self, workflow_name):
         # Fix workflow name

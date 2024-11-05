@@ -74,3 +74,29 @@ def script(script_name):
     except InvokerError as err:
         click.secho("Invoker Error: ", err=True, nl=False, fg="red")
         click.echo(err, err=True)
+
+
+@cli.command()
+@click.argument("script_name")
+def run(script_name):
+    click.secho(f"Running script {script_name}...", fg="yellow")
+    project = Project(Path())
+    try:
+        project.load()
+        project.run_script(script_name)
+    except InvokerError as err:
+        click.secho("Invoker Error: ", err=True, nl=False, fg="red")
+        click.echo(err, err=True)
+
+
+@cli.command()
+@click.argument("script_name")
+def debug(script_name):
+    click.secho(f"Running script {script_name}...", fg="yellow")
+    project = Project(Path())
+    try:
+        project.load()
+        project.debug_script(script_name)
+    except InvokerError as err:
+        click.secho("Invoker Error: ", err=True, nl=False, fg="red")
+        click.echo(err, err=True)

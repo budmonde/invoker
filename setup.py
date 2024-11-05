@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='invoker',
-    version='0.1',
+    version='0.2.0',
     py_modules=['invoker'],
     install_requires=[
         'Click',

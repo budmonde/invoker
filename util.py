@@ -1,5 +1,5 @@
 from datetime import date
-from importlib import resources
+from importlib import metadata, resources
 import hashlib
 
 
@@ -26,7 +26,7 @@ def compute_file_hash(path):
 
 
 GENERATED_MESSAGE = f"""\
-# Invoker: v0.0.1
+# Invoker: v{metadata.version('invoker')}
 # DO NOT MANUALLY EDIT THIS FILE.
 #
 # This script was generated with invoker.

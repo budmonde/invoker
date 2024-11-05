@@ -2,13 +2,18 @@ import argparse
 import copy
 import cProfile as profile
 import importlib
+import importlib.util
+import inspect
 import logging
 import logging.config
 import os
 import pprint
 import pstats
 import re
+import sys
 from pathlib import Path
+
+from IPython.terminal.embed import InteractiveShellEmbed
 
 
 class Script:
@@ -85,6 +90,15 @@ class Script:
         stats = pstats.Stats(prof).strip_dirs().sort_stats("cumtime")
         stats.print_stats(top)
 
+    def embed(self):
+        caller_frame = inspect.currentframe().f_back
+        module = get_module(caller_frame.f_globals["__file__"])
+        shell = InteractiveShellEmbed(user_module=module)
+
+        local_namespace = dict(caller_frame.f_locals)
+        module.__dict__.update(local_namespace)
+        shell()
+
 
 def _to_underscore_case(string):
     return "_".join([token.lower() for token in re.findall("[A-Z][^A-Z]*", string)])
@@ -109,7 +123,7 @@ def _initialize_logger(log_to_console, logfile_root, logfile_name):
         logger_dict["formatters"]["pretty"] = {
             "format": "%(asctime)s [%(levelname)-8s] %(filename)s:%(lineno)d.%(funcName)s() %(message)s",
             "datefmt": "%H:%M:%S",
-            "class": "invoker.InvokerFormatter" if __package__ == "" else ".".join([__package__, "invoker.InvokerFormatter"]),
+            "class": "invoker.InvokerFormatter" if (__package__ == "") or (__package__ == None) else ".".join([__package__, "invoker.InvokerFormatter"]),
         }
         logger_dict["handlers"]["console"] = {
             "class": "logging.StreamHandler",
@@ -256,3 +270,98 @@ def _deserialize_config(config):
         else:
             setattr(opt, k, v)
     return opt
+
+
+def get_module(file_name):
+    if file_name is None:
+        return None
+    module_name = file_name.replace(os.sep, ".").replace(".py", "")
+    spec = importlib.util.spec_from_file_location(module_name, file_name)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def get_embed_instrumented_module(file_name, embed_line_num):
+    with open(file_name, "r") as fp:
+        lines = fp.readlines()
+
+    script_class_name = _to_camel_case(file_name.replace(".py", ""))
+
+    try:
+        script_line_number = next(
+            i for i, line in enumerate(lines)
+            if line.startswith(f"class {script_class_name}")
+        )
+    except StopIteration:
+        raise RuntimeError("Invalid script %s", file_name)
+
+    get_indent = lambda line: len(line) - len(line.lstrip())
+
+    if embed_line_num is None:
+        in_run = False
+        for index in range(script_line_number, len(lines) - 1):
+            line = lines[index]
+            if line.lstrip().startswith("def run"):
+                in_run = True
+                indent_size = get_indent(line) + 4
+            elif in_run:
+                if len(line.strip()) > 0 and get_indent(line) < (indent_size or 0):
+                    embed_line_num = index - 1
+                    break
+        if embed_line_num is None:
+            embed_line_num = len(lines) - 1
+    else:
+        indent_size = get_indent(lines[embed_line_num - 1])
+
+    embed_line = " " * indent_size + "self.embed()\n"
+
+    new_lines = list(lines)
+    new_lines.insert(embed_line_num + 1, embed_line)
+    new_file = file_name.replace(".py", "_insert_embed.py")
+
+    with open(new_file, "w") as fp:
+        fp.writelines(new_lines)
+
+    module = get_module(new_file)
+    module.__file__ = file_name
+
+    os.remove(new_file)
+    return module
+
+
+def get_script(file_name, embed=False, embed_line_num=None):
+    if not embed:
+        module = get_module(file_name)
+    else:
+        module = get_embed_instrumented_module(file_name, embed_line_num)
+    class_name = _to_camel_case(file_name.replace(os.sep, ".").replace(".py", ""))
+    script = getattr(module, class_name)
+    return script
+
+
+if __name__ == "__main__":
+    _initialize_logger(True, None, "invoker")
+    argv = sys.argv.copy()[1:]
+
+    if len(argv) < 1:
+        raise RuntimeError("Must run invoker.py script with a command (e.g., invoker.py run <script_name).")
+    command = argv.pop(0)
+
+    if command == "run":
+        if len(argv) < 1:
+            raise RuntimeError("Must specify script to run (e.g., invoker.py run <script_name>)")
+        script_name = argv.pop(0)
+        script = get_script(script_name)
+        script(args_list = argv).run()
+
+    if command == "debug":
+        if len(argv) < 1:
+            raise RuntimeError("Must specify script to debug (e.g., invoker.py debug <script_name>)")
+        script_match = re.match(r"^(\w+\.\w+)(?::(\d+))?$", argv.pop(0))
+        if not script_match:
+            raise RuntimeError("Invalid script name + line number.")
+        script_name = script_match.group(1)
+        embed_line_num = int(script_match.group(2)) if script_match.group(2) else None
+        script = get_script(script_name, embed = True, embed_line_num = embed_line_num)
+        script(args_list = argv).run()
