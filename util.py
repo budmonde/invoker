@@ -31,7 +31,7 @@ GENERATED_MESSAGE = f"""\
 #
 # This script was generated with invoker.
 # To regenerate file, run `invoker rebuild`.
-# Date:\t{date.today().strftime("%d/%m/%Y")}
+# Date:\t{date.today().strftime("%Y-%m-%d")}
 """
 
 

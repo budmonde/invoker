@@ -1,3 +1,4 @@
+from importlib import metadata
 from pathlib import Path
 import re
 import subprocess
@@ -110,7 +111,8 @@ class Project:
             if not init_path.exists():
                 continue
             with open(init_path) as init_f:
-                if not init_f.readline().startswith("# Invoker: v0.0.1"):
+                import pdb; pdb.set_trace()
+                if not init_f.readline().startswith(f"# Invoker: v{metadata.version('invoker')}"):
                     continue
             self._rebuild_resource("module_init.resource.py", init_path, sign=True)
 
@@ -126,5 +128,18 @@ class Project:
             copy_resource(resource_name, path, sign=sign)
             return
         if resource_hash != cached_hash:
+            copy_resource(resource_name, path, sign=sign)
+            return
+
+        with open(path, "r") as fp:
+            file_version_line = fp.readline()
+        version_match = re.match(r"# Invoker: v(\d+\.\d+\.\d+)$", file_version_line)
+
+        if not version_match:
+            copy_resource(resource_name, path, sign=sign)
+            return
+
+        version = version_match.group(1)
+        if version != metadata.version('invoker'):
             copy_resource(resource_name, path, sign=sign)
             return
