@@ -111,7 +111,6 @@ class Project:
             if not init_path.exists():
                 continue
             with open(init_path) as init_f:
-                import pdb; pdb.set_trace()
                 if not init_f.readline().startswith(f"# Invoker: v{metadata.version('invoker')}"):
                     continue
             self._rebuild_resource("module_init.resource.py", init_path, sign=True)
