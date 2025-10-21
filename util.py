@@ -1,5 +1,6 @@
 from datetime import date
-from importlib import metadata, resources
+from importlib import metadata
+from importlib.resources import files
 import hashlib
 
 
@@ -10,7 +11,8 @@ def _compute_hash(string):
 
 
 def compute_resource_hash(resource_fn):
-    with resources.open_binary("resources", resource_fn) as f:
+    resource_files = files("resources")
+    with (resource_files / resource_fn).open('rb') as f:
         return _compute_hash(f.read())
 
 
@@ -36,9 +38,10 @@ GENERATED_MESSAGE = f"""\
 
 
 def copy_resource(src_fn, dst_path, sign=False, preprocess_fn=lambda l: l):
-    with resources.open_binary("resources", src_fn) as f:
+    resource_files = files("resources")
+    with (resource_files / src_fn).open('rb') as f:
         file_hash = _compute_hash(f.read())
-    with resources.open_text("resources", src_fn) as inf, open(dst_path, "w") as outf:
+    with (resource_files / src_fn).open('r', encoding='utf-8') as inf, open(dst_path, "w") as outf:
         if sign:
             outf.write(GENERATED_MESSAGE)
             outf.write(f"# Hash:\t{file_hash}\n")

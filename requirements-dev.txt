@@ -1,0 +1,16 @@
+# Development dependencies for invoker
+# Install with: pip install -r requirements-dev.txt
+
+# Main dependencies (for standalone dev install)
+Click>=8.0.0
+ipython>=8.0.0
+
+# Testing
+pytest>=7.0.0
+pytest-cov>=4.0.0
+
+# Code formatting and linting
+black>=23.0.0
+isort>=5.12.0
+flake8>=6.0.0
+

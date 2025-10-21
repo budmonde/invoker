@@ -1,0 +1,30 @@
+# Coverage configuration for invoker
+# Usage: python -m pytest --cov (requires pytest-cov)
+
+[run]
+source = .
+omit =
+    tests/*
+    resources/*
+    setup.py
+    */__pycache__/*
+    */venv/*
+    */env/*
+
+[report]
+# Show which lines are missing coverage
+show_missing = True
+
+# Exclude lines from coverage
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod
+
+[html]
+directory = htmlcov
+

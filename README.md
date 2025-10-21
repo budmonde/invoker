@@ -63,16 +63,26 @@ conducive for publication.
 
 ## Installation
 
+### From Source
+
 Clone the repository:
 
-```
+```bash
 git clone https://github.com/budmonde/invoker.git
+cd invoker
 ```
 
-Navigate into the repo, and run:
+Install the package:
 
-```
-pip install invoker
+```bash
+# Standard installation
+pip install .
+
+# Editable installation for development
+pip install -e .
+
+# With development tools
+pip install -e ".[dev]"
 ```
 
 ## Documentation
@@ -80,12 +90,43 @@ pip install invoker
 Basic tutorial and documentation at
 [invoke.readthedocs.io](https://invoke.readthedocs.io/).
 
+## Testing
+
+Integration tests are located in the `tests/` directory. To run the tests:
+
+```bash
+# Install with test dependencies
+pip install -e ".[test]"
+
+# Or install dev dependencies (includes test tools + linters)
+pip install -r requirements-dev.txt
+
+# Run all tests with coverage
+pytest
+
+# Or use the provided test runner script
+./run_tests.sh
+```
+
+Coverage reports are generated in the `htmlcov/` directory.
+
 ## Feature To-do list
 
 1. Enable loading multiple deps of the same type from a module
 
 ## Dependencies
 
-```
-pyyaml
-```
+Runtime dependencies (automatically installed with the package):
+
+- **Click** - Command-line interface framework
+- **IPython** - Interactive debugging support
+
+Development dependencies (install with `pip install -e ".[dev]"`):
+
+- **pytest** - Testing framework
+- **pytest-cov** - Test coverage
+- **black** - Code formatter
+- **isort** - Import organizer  
+- **flake8** - Code linter
+
+See `pyproject.toml` for specific version requirements.

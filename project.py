@@ -79,6 +79,9 @@ class Project:
 
     def debug_script(self, script_name_with_line_num):
         script_match = re.match(r"^(\w+\.\w+)(?::(\d+))?$", script_name_with_line_num)
+        if not script_match:
+            raise InvokerError(f"Invalid script name format: {script_name_with_line_num}. Expected format: script.py or script.py:line_number")
+        
         script_name = script_match.group(1)
         embed_line_num = int(script_match.group(2)) if script_match.group(2) else None
 
@@ -87,31 +90,15 @@ class Project:
             raise InvokerError(f"script does not exist at {script_path}.")
         subprocess.call(['python', 'invoker.py', 'debug', script_name_with_line_num])
 
-    def create_workflow(self, workflow_name):
-        # Fix workflow name
-        if workflow_name.endswith(".py"):
-            workflow_name = workflow_name.removesuffix(".py")
-        # Add boilerplate base workflow
-        workflow_path = self.root_path / f"{workflow_name}.py"
-        if workflow_path.exists():
-            raise InvokerError(f"workflow already exists at {workflow_path}.")
-        copy_resource(
-            "workflow.resource.py",
-            workflow_path,
-            preprocess_fn=lambda l: l.replace("__WORKFLOW__", to_camel_case(workflow_name)),
-        )
-        workflow_path.chmod(0o744)
-
     def rebuild(self):
         self._rebuild_resource("invoker.resource.py", self.invoker_path, sign=True)
-        for path in self.root_path.iterdir():
-            if not path.is_dir():
-                continue
-            init_path = path / "__init__.py"
-            if not init_path.exists():
+        for init_path in self.root_path.rglob("**/__init__.py"):
+            if not init_path.is_file():
                 continue
             with open(init_path) as init_f:
-                if not init_f.readline().startswith(f"# Invoker: v{metadata.version('invoker')}"):
+                file_version_line = init_f.readline()
+                version_match = re.match(r"# Invoker: v(\d+\.\d+\.\d+)$", file_version_line)
+                if not version_match:
                     continue
             self._rebuild_resource("module_init.resource.py", init_path, sign=True)
 
@@ -127,18 +114,5 @@ class Project:
             copy_resource(resource_name, path, sign=sign)
             return
         if resource_hash != cached_hash:
-            copy_resource(resource_name, path, sign=sign)
-            return
-
-        with open(path, "r") as fp:
-            file_version_line = fp.readline()
-        version_match = re.match(r"# Invoker: v(\d+\.\d+\.\d+)$", file_version_line)
-
-        if not version_match:
-            copy_resource(resource_name, path, sign=sign)
-            return
-
-        version = version_match.group(1)
-        if version != metadata.version('invoker'):
             copy_resource(resource_name, path, sign=sign)
             return

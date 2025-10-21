@@ -1,2 +1,6 @@
-sphinx==3.5.4
-myst-parser==0.14.0
+# Documentation dependencies for invoker
+# Install with: pip install -r docs/requirements.txt
+
+sphinx>=7.0.0
+myst-parser>=2.0.0
+sphinx-rtd-theme>=2.0.0

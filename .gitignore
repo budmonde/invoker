@@ -3,3 +3,9 @@ __pycache__
 docs/_build
 
 *.sw*
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml

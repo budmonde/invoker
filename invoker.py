@@ -20,25 +20,32 @@ def init():
     except InvokerError as err:
         click.secho("Invoker Error: ", err=True, nl=False, fg="red")
         click.echo(err, err=True)
+        raise SystemExit(1)
 
 
 @cli.command()
 def lint():
     project = Project(Path())
-    project.load()
-    project.lint()
+    try:
+        project.load()
+        project.lint()
+    except InvokerError as err:
+        click.secho("Invoker Error: ", err=True, nl=False, fg="red")
+        click.echo(err, err=True)
+        raise SystemExit(1)
 
 
 @cli.command()
 def rebuild():
     click.secho("Rebuildng project...", fg="yellow")
-    project = Project(Path()).load()
     try:
+        project = Project(Path()).load()
         project.rebuild()
         click.secho("Success!", fg="green")
     except InvokerError as err:
         click.secho("Invoker Error: ", err=True, nl=False, fg="red")
         click.echo(err, err=True)
+        raise SystemExit(1)
 
 
 @cli.group()
@@ -59,6 +66,7 @@ def module(module_name):
     except InvokerError as err:
         click.secho("Invoker Error: ", err=True, nl=False, fg="red")
         click.echo(err, err=True)
+        raise SystemExit(1)
 
 
 @create.command()
@@ -74,6 +82,7 @@ def script(script_name):
     except InvokerError as err:
         click.secho("Invoker Error: ", err=True, nl=False, fg="red")
         click.echo(err, err=True)
+        raise SystemExit(1)
 
 
 @cli.command()
@@ -87,6 +96,7 @@ def run(script_name):
     except InvokerError as err:
         click.secho("Invoker Error: ", err=True, nl=False, fg="red")
         click.echo(err, err=True)
+        raise SystemExit(1)
 
 
 @cli.command()
@@ -100,3 +110,4 @@ def debug(script_name):
     except InvokerError as err:
         click.secho("Invoker Error: ", err=True, nl=False, fg="red")
         click.echo(err, err=True)
+        raise SystemExit(1)
