@@ -1,14 +1,14 @@
 """Invoker Python Project Manager
 
-This script enables bootstrappable python script authoring that are easy to configure with command line arguments, interactive debugging, profiling, logging infrastructure, and dynamic module loading. To create a bootstrapped script, inherit from the "Script" class and implement the run() function. For example:
+This script enables bootstrappable python script authoring that are easy to configure with command line arguments, interactive debugging, profiling, logging infrastructure, and dynamic module loading. To create a bootstrapped script, inherit from the "InvokerScript" class and implement the run() function. For example:
 
 ```
 import logging
 
-from invoker import Script
+from invoker import InvokerScript
 
 
-class MyScript(Script):
+class MyScript(InvokerScript):
     @classmethod
     def args(cls):
         args = super().args()
@@ -20,9 +20,37 @@ class MyScript(Script):
         logging.info(f'Hello World! You've passed {self.opt.key} from the command line.')
 ```
 
+To use modules, import the module classes and specify them in the modules() method:
+
+```
+import logging
+
+from invoker import InvokerScript
+from my_modules import DataLoader
+
+
+class MyScript(InvokerScript):
+    @classmethod
+    def modules(cls):
+        mods = super().modules()
+        mods.update(dict(
+            my_data_loader=DataLoader
+        ))
+        return mods
+
+    def run(self):
+        super().run()
+        logging.info(f'Data path: {self.my_data_loader.opt.path}')
+```
+
 To run the script, run
 ```
 python invoker.py run my_script.py --key custom_value
+```
+
+To pass module options from command line:
+```
+python invoker.py run my_script.py --my_data_loader.path /data/input
 ```
 
 To enter an interactive ipython session at a specific line within the script, run
@@ -48,7 +76,7 @@ import sys
 from pathlib import Path
 
 
-class Script:
+class InvokerScript:
     """
         @args_dict         : keyword argument overrides to default values of self.args()
         @args_list         : argv list passed into argparse. args_dict takes priority
@@ -69,17 +97,14 @@ class Script:
 
         parser_manager = ParserManager()
         parser_manager.add_arguments(self.args())
-        for module_name, module_mode in self.modules().items():
-            cls = _load_class(module_name, module_mode)
-            parser_manager.add_arguments(cls.args(), key_prefix = module_name)
+        for attr_name, module_cls in self.modules().items():
+            parser_manager.add_arguments(module_cls.args(), key_prefix = attr_name)
         script_config = self.build_config(parser_manager.parse_args(args_dict, args_list))
 
         module_conf = {}
-        for module_name, module_mode in self.modules().items():
-            cls = _load_class(module_name, module_mode)
-
+        for attr_name, module_cls in self.modules().items():
             is_valid_module_conf = lambda key: len(key.split(".")) == 2
-            module_conf_matches_module = lambda key: key.split(".")[0] == module_name
+            module_conf_matches_module = lambda key: key.split(".")[0] == attr_name
             get_module_conf_key = lambda key: key.split(".")[1]
             module_args = {
                 get_module_conf_key(key) : value
@@ -87,11 +112,11 @@ class Script:
                 if is_valid_module_conf(key) and module_conf_matches_module(key)
             }
 
-            cls_inst = cls(module_args)
-            setattr(self, module_name, cls_inst)
-            module_conf[module_name] = _serialize_opt(cls_inst.opt)
+            cls_inst = module_cls(module_args)
+            setattr(self, attr_name, cls_inst)
+            module_conf[attr_name] = _serialize_opt(cls_inst.opt)
             for module_arg in module_args.keys():
-                del script_config[".".join([module_name, module_arg])]
+                del script_config[".".join([attr_name, module_arg])]
         script_config.update(module_conf)
         self.opt = _deserialize_config(script_config)
 
@@ -262,12 +287,7 @@ def _build_key(kname: str, key_prefix: str =None) -> str:
     return f"--{kname}" if key_prefix is None else f"--{key_prefix}.{kname}"
 
 
-def _load_class(module_name, module_mode):
-    module_full_name = module_name if __package__ == "" else ".".join([__package__, module_name])
-    return importlib.import_module(module_full_name).get_class(module_mode)
-
-
-class Module:
+class InvokerModule:
     def __init__(self, args_dict=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if args_dict is not None:

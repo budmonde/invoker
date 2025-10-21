@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-from invoker import Script
+from invoker import InvokerScript
 
 
-class __SCRIPT__(Script):
+class __SCRIPT__(InvokerScript):
     @classmethod
     def args(cls):
         args = super().args()
@@ -16,7 +16,8 @@ class __SCRIPT__(Script):
         mods = super().modules()
         mods.update(dict(
             # Add module dependencies
-            # module="mode"
+            # Import module classes at the top of the file, then add them here:
+            # my_module_instance=MyModuleClass
         ))
         return mods
 

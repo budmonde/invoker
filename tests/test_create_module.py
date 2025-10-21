@@ -4,7 +4,8 @@ from pathlib import Path
 
 from importlib import metadata
 
-from project import Project, InvokerError
+from project import Project
+import pytest
 from util import compute_resource_hash, compute_file_hash, to_camel_case
 
 
@@ -26,23 +27,8 @@ class TestCreateModule:
         assert module_dir.exists(), f"{module_name} directory should be created"
         assert module_dir.is_dir(), f"{module_name} should be a directory"
     
-    def test_create_module_creates_init_file(self, temp_project_dir):
-        """Test that create module creates __init__.py in the module directory."""
-        # Initialize project first
-        project = Project(temp_project_dir)
-        project.initialize()
-        
-        # Create a module
-        module_name = "test_module"
-        project.create_module(module_name)
-        
-        # Check that __init__.py exists
-        init_file = temp_project_dir / module_name / "__init__.py"
-        assert init_file.exists(), "__init__.py should be created in module directory"
-        assert init_file.is_file(), "__init__.py should be a regular file"
-    
-    def test_create_module_init_content(self, temp_project_dir):
-        """Test that the module __init__.py has correct content and signature."""
+    def test_create_module_init_file(self, temp_project_dir):
+        """Test that the module __init__.py is created as an empty file."""
         # Initialize project first
         project = Project(temp_project_dir)
         project.initialize()
@@ -53,55 +39,16 @@ class TestCreateModule:
         
         init_file = temp_project_dir / module_name / "__init__.py"
         
+        # Check that file exists
+        assert init_file.exists(), "__init__.py should exist"
+        assert init_file.is_file(), "__init__.py should be a file"
+        
         # Read the file contents
         with open(init_file, "r") as f:
             content = f.read()
-            lines = content.split('\n')
         
-        # Check that file is not empty
-        assert len(content) > 0, "__init__.py should not be empty"
-        
-        # Check version header
-        version_line = lines[0]
-        assert version_line.startswith("# Invoker: v"), \
-            "First line should contain version header"
-        version_match = re.match(r"# Invoker: v(\d+\.\d+\.\d+)", version_line.strip())
-        assert version_match, "Version header should have correct format"
-        file_version = version_match.group(1)
-        current_version = metadata.version('invoker')
-        assert file_version == current_version, \
-            f"File version {file_version} should match current invoker version {current_version}"
-        
-        # Check DO NOT EDIT warning
-        assert "# DO NOT MANUALLY EDIT THIS FILE." in content, \
-            "__init__.py should contain DO NOT EDIT warning"
-        
-        # Check hash line exists
-        hash_line_found = False
-        for line in lines[:10]:
-            if line.startswith("# Hash:"):
-                hash_line_found = True
-                break
-        assert hash_line_found, "__init__.py should contain hash signature in header"
-        
-        # Verify hash integrity
-        resource_hash = compute_resource_hash("module_init.resource.py")
-        cached_hash, computed_hash = compute_file_hash(init_file)
-        
-        assert cached_hash == resource_hash, \
-            "Cached hash should match the resource hash"
-        assert computed_hash == resource_hash, \
-            "Computed hash should match the resource hash"
-        
-        # Check for key components
-        assert "import importlib" in content, \
-            "__init__.py should import importlib"
-        assert "def get_class(mode):" in content, \
-            "__init__.py should define get_class function"
-        assert "_MODULE_NAME" in content, \
-            "__init__.py should define _MODULE_NAME"
-        assert "_CLASSES" in content, \
-            "__init__.py should define _CLASSES"
+        # Check that file is empty (just makes the directory a Python package)
+        assert len(content) == 0, "__init__.py should be empty"
     
     def test_create_module_creates_base_file(self, temp_project_dir):
         """Test that create module creates base_<module_name>.py file."""
@@ -141,7 +88,7 @@ class TestCreateModule:
         
         # Check that the module name was properly substituted in camel case
         expected_class_name = f"Base{to_camel_case(module_name)}"
-        assert f"class {expected_class_name}(Module):" in content, \
+        assert f"class {expected_class_name}(InvokerModule):" in content, \
             f"Should contain class definition with name {expected_class_name}"
         
         # Check that __MODULE__ placeholder was replaced
@@ -149,8 +96,8 @@ class TestCreateModule:
             "Template placeholder __MODULE__ should be replaced"
         
         # Check for key module components
-        assert "from invoker import Module" in content, \
-            "Base module should import Module class"
+        assert "from invoker import InvokerModule" in content, \
+            "Base module should import InvokerModule class"
         assert "def args(cls):" in content, \
             "Base module should have args method"
         assert "@classmethod" in content, \
@@ -174,7 +121,7 @@ class TestCreateModule:
         
         # Check that the class name is in CamelCase
         expected_class_name = "BaseMyComplexModuleName"
-        assert f"class {expected_class_name}(Module):" in content, \
+        assert f"class {expected_class_name}(InvokerModule):" in content, \
             f"Class name should be {expected_class_name}"
     
     def test_create_module_structure(self, temp_project_dir):
@@ -213,12 +160,10 @@ class TestCreateModule:
         project.create_module(module_name)
         
         # Try to create the same module again
-        try:
+        with pytest.raises(SystemExit) as exc_info:
             project.create_module(module_name)
-            assert False, "Should raise InvokerError when module already exists"
-        except InvokerError as e:
-            assert "already exists" in str(e), \
-                "Error message should mention module already exists"
+        
+        assert exc_info.value.code == 1
     
     def test_create_multiple_modules(self, temp_project_dir):
         """Test that multiple modules can be created in the same project."""
@@ -246,7 +191,7 @@ class TestCreateModule:
             with open(base_file, "r") as f:
                 content = f.read()
             expected_class_name = f"Base{to_camel_case(module_name)}"
-            assert f"class {expected_class_name}(Module):" in content, \
+            assert f"class {expected_class_name}(InvokerModule):" in content, \
                 f"{module_name} should have class {expected_class_name}"
     
     def test_create_module_and_script_coexist(self, temp_project_dir):
@@ -292,7 +237,7 @@ class TestCreateModule:
         
         # Verify proper inheritance
         expected_class_name = f"Base{to_camel_case(module_name)}"
-        assert f"class {expected_class_name}(Module):" in content, \
+        assert f"class {expected_class_name}(InvokerModule):" in content, \
             "Base class should inherit from Module"
         
         # Verify it calls super().args()

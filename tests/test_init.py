@@ -69,14 +69,14 @@ class TestInit:
         assert computed_hash == resource_hash, "Computed hash should match the resource hash"
         
         # Check that key components are present in the file
-        assert "class Script:" in content, "invoker.py should contain Script class"
-        assert "class Module:" in content, "invoker.py should contain Module class"
+        assert "class InvokerScript:" in content, "invoker.py should contain InvokerScript class"
+        assert "class InvokerModule:" in content, "invoker.py should contain InvokerModule class"
         assert "def __init__" in content, "invoker.py should contain initialization methods"
         assert "if __name__ == \"__main__\":" in content, "invoker.py should have main entry point"
     
     def test_init_fails_if_already_initialized(self, temp_project_dir):
         """Test that invoker init fails when project is already initialized."""
-        from project import InvokerError
+        import pytest
         
         # Initialize project first time
         project = Project(temp_project_dir)
@@ -84,9 +84,8 @@ class TestInit:
         
         # Try to initialize again
         project2 = Project(temp_project_dir)
-        try:
+        with pytest.raises(SystemExit) as exc_info:
             project2.initialize()
-            assert False, "Should raise InvokerError when invoker.py already exists"
-        except InvokerError as e:
-            assert "already exists" in str(e), "Error message should mention file already exists"
+        
+        assert exc_info.value.code == 1
 

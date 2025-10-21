@@ -266,10 +266,10 @@ class TestInvokerCLI:
             # Modify script to create a marker file
             script_file = Path("runnable_script.py")
             script_content = '''#!/usr/bin/env python
-from invoker import Script
+from invoker import InvokerScript
 
 
-class RunnableScript(Script):
+class RunnableScript(InvokerScript):
     def run(self):
         super().run()
         with open("marker.txt", "w") as f:

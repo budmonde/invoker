@@ -79,13 +79,6 @@ class TestComputeResourceHash:
         assert isinstance(result, str), "Hash should be a string"
         assert len(result) == 32, "MD5 hash should be 32 characters"
     
-    def test_compute_resource_hash_module_init(self):
-        """Test computing hash of module_init.resource.py."""
-        result = compute_resource_hash("module_init.resource.py")
-        
-        assert isinstance(result, str), "Hash should be a string"
-        assert len(result) == 32, "MD5 hash should be 32 characters"
-    
     def test_compute_resource_hash_module_base(self):
         """Test computing hash of module_base.resource.py."""
         result = compute_resource_hash("module_base.resource.py")
@@ -176,7 +169,7 @@ class TestCopyResource:
             content = f.read()
         
         assert len(content) > 0, "File should have content"
-        assert "from invoker import Script" in content, \
+        assert "from invoker import InvokerScript" in content, \
             "Should contain script template content"
     
     def test_copy_resource_with_signing(self, temp_project_dir):
@@ -207,10 +200,10 @@ class TestCopyResource:
     def test_copy_resource_signed_hash_integrity(self, temp_project_dir):
         """Test that signed resource has correct hash."""
         dest_file = temp_project_dir / "hashed_file.py"
-        copy_resource("module_init.resource.py", dest_file, sign=True)
+        copy_resource("module_base.resource.py", dest_file, sign=True)
         
         # Compute resource hash
-        resource_hash = compute_resource_hash("module_init.resource.py")
+        resource_hash = compute_resource_hash("module_base.resource.py")
         
         # Compute file hash
         stored_hash, computed_hash = compute_file_hash(dest_file)

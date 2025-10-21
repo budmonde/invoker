@@ -3,7 +3,8 @@ import os
 import stat
 from pathlib import Path
 
-from project import Project, InvokerError
+from project import Project
+import pytest
 from util import to_camel_case
 
 
@@ -60,7 +61,7 @@ class TestCreateScript:
         
         # Check that the script name was properly substituted in camel case
         expected_class_name = to_camel_case(script_name)
-        assert f"class {expected_class_name}(Script):" in content, \
+        assert f"class {expected_class_name}(InvokerScript):" in content, \
             f"Should contain class definition with name {expected_class_name}"
         
         # Check that all occurrences of __SCRIPT__ were replaced
@@ -70,8 +71,8 @@ class TestCreateScript:
         # Check for key script components
         assert "#!/usr/bin/env python" in content, \
             "Script should have shebang line"
-        assert "from invoker import Script" in content, \
-            "Script should import Script class"
+        assert "from invoker import InvokerScript" in content, \
+            "Script should import InvokerScript class"
         assert "def args(cls):" in content, \
             "Script should have args method"
         assert "def modules(cls):" in content, \
@@ -103,7 +104,7 @@ class TestCreateScript:
         
         # Check that the class name is in CamelCase
         expected_class_name = "MyComplexScriptName"
-        assert f"class {expected_class_name}(Script):" in content, \
+        assert f"class {expected_class_name}(InvokerScript):" in content, \
             f"Class name should be {expected_class_name}"
         assert f"{expected_class_name}(run_as_root_script=True).run()" in content, \
             f"Should instantiate {expected_class_name}"
@@ -149,12 +150,10 @@ class TestCreateScript:
         project.create_script(script_name)
         
         # Try to create the same script again
-        try:
+        with pytest.raises(SystemExit) as exc_info:
             project.create_script(script_name)
-            assert False, "Should raise InvokerError when script already exists"
-        except InvokerError as e:
-            assert "already exists" in str(e), \
-                "Error message should mention script already exists"
+        
+        assert exc_info.value.code == 1
     
     def test_create_multiple_scripts(self, temp_project_dir):
         """Test that multiple scripts can be created in the same project."""
@@ -176,6 +175,6 @@ class TestCreateScript:
             with open(script_file, "r") as f:
                 content = f.read()
             expected_class_name = to_camel_case(script_name)
-            assert f"class {expected_class_name}(Script):" in content, \
+            assert f"class {expected_class_name}(InvokerScript):" in content, \
                 f"{script_name}.py should have class {expected_class_name}"
 

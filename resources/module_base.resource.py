@@ -1,7 +1,7 @@
-from invoker import Module
+from invoker import InvokerModule
 
 
-class Base__MODULE__(Module):
+class Base__MODULE__(InvokerModule):
     @classmethod
     def args(cls):
         args = super().args()

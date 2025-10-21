@@ -23,11 +23,11 @@ class TestRunScript:
         
         # Modify the script to have specific arguments and write output
         script_content = '''#!/usr/bin/env python
-from invoker import Script
+from invoker import InvokerScript
 import json
 
 
-class TestArgsScript(Script):
+class TestArgsScript(InvokerScript):
     @classmethod
     def args(cls):
         args = super().args()
@@ -105,11 +105,11 @@ if __name__ == "__main__":
         script_file = temp_project_dir / f"{script_name}.py"
         
         script_content = '''#!/usr/bin/env python
-from invoker import Script
+from invoker import InvokerScript
 import json
 
 
-class StringOverrideScript(Script):
+class StringOverrideScript(InvokerScript):
     @classmethod
     def args(cls):
         args = super().args()
@@ -162,11 +162,11 @@ if __name__ == "__main__":
         script_file = temp_project_dir / f"{script_name}.py"
         
         script_content = '''#!/usr/bin/env python
-from invoker import Script
+from invoker import InvokerScript
 import json
 
 
-class NumericOverrideScript(Script):
+class NumericOverrideScript(InvokerScript):
     @classmethod
     def args(cls):
         args = super().args()
@@ -225,11 +225,11 @@ if __name__ == "__main__":
         script_file = temp_project_dir / f"{script_name}.py"
         
         script_content = '''#!/usr/bin/env python
-from invoker import Script
+from invoker import InvokerScript
 import json
 
 
-class ListOverrideScript(Script):
+class ListOverrideScript(InvokerScript):
     @classmethod
     def args(cls):
         args = super().args()
@@ -282,11 +282,11 @@ if __name__ == "__main__":
         script_file = temp_project_dir / f"{script_name}.py"
         
         script_content = '''#!/usr/bin/env python
-from invoker import Script
+from invoker import InvokerScript
 import json
 
 
-class BoolFlagScript(Script):
+class BoolFlagScript(InvokerScript):
     @classmethod
     def args(cls):
         args = super().args()
@@ -345,11 +345,11 @@ if __name__ == "__main__":
         script_file = temp_project_dir / f"{script_name}.py"
         
         script_content = '''#!/usr/bin/env python
-from invoker import Script
+from invoker import InvokerScript
 import json
 
 
-class MixedArgsScript(Script):
+class MixedArgsScript(InvokerScript):
     @classmethod
     def args(cls):
         args = super().args()
@@ -420,11 +420,11 @@ if __name__ == "__main__":
         script_file = temp_project_dir / f"{script_name}.py"
         
         script_content = '''#!/usr/bin/env python
-from invoker import Script
+from invoker import InvokerScript
 import json
 
 
-class InvokerRunTest(Script):
+class InvokerRunTest(InvokerScript):
     @classmethod
     def args(cls):
         args = super().args()
@@ -478,11 +478,11 @@ if __name__ == "__main__":
         script_file = temp_project_dir / f"{script_name}.py"
         
         script_content = '''#!/usr/bin/env python
-from invoker import Script
+from invoker import InvokerScript
 import json
 
 
-class EmptyListScript(Script):
+class EmptyListScript(InvokerScript):
     @classmethod
     def args(cls):
         args = super().args()
@@ -552,10 +552,10 @@ if __name__ == "__main__":
         
         # Modify the base module to have specific arguments
         module_base_file = temp_project_dir / module_name / f"base_{module_name}.py"
-        module_content = '''from invoker import Module
+        module_content = '''from invoker import InvokerModule
 
 
-class BaseDataLoader(Module):
+class BaseDataLoader(InvokerModule):
     @classmethod
     def args(cls):
         args = super().args()
@@ -578,16 +578,17 @@ class BaseDataLoader(Module):
         script_file = temp_project_dir / f"{script_name}.py"
         
         script_content = '''#!/usr/bin/env python
-from invoker import Script
+from invoker import InvokerScript
+from data_loader.base_data_loader import BaseDataLoader
 import json
 
 
-class TrainModel(Script):
+class TrainModel(InvokerScript):
     @classmethod
     def modules(cls):
         mods = super().modules()
         mods.update(dict(
-            data_loader="base"
+            data_loader=BaseDataLoader
         ))
         return mods
 
@@ -648,10 +649,10 @@ if __name__ == "__main__":
         
         # Modify the base module
         module_base_file = temp_project_dir / module_name / f"base_{module_name}.py"
-        module_content = '''from invoker import Module
+        module_content = '''from invoker import InvokerModule
 
 
-class BaseProcessor(Module):
+class BaseProcessor(InvokerModule):
     @classmethod
     def args(cls):
         args = super().args()
@@ -673,16 +674,17 @@ class BaseProcessor(Module):
         script_file = temp_project_dir / f"{script_name}.py"
         
         script_content = '''#!/usr/bin/env python
-from invoker import Script
+from invoker import InvokerScript
+from processor.base_processor import BaseProcessor
 import json
 
 
-class ProcessData(Script):
+class ProcessData(InvokerScript):
     @classmethod
     def modules(cls):
         mods = super().modules()
         mods.update(dict(
-            processor="base"
+            processor=BaseProcessor
         ))
         return mods
 
@@ -741,10 +743,10 @@ if __name__ == "__main__":
         project.create_module(module1_name)
         
         module1_base_file = temp_project_dir / module1_name / f"base_{module1_name}.py"
-        module1_content = '''from invoker import Module
+        module1_content = '''from invoker import InvokerModule
 
 
-class BaseLoader(Module):
+class BaseLoader(InvokerModule):
     @classmethod
     def args(cls):
         args = super().args()
@@ -762,10 +764,10 @@ class BaseLoader(Module):
         project.create_module(module2_name)
         
         module2_base_file = temp_project_dir / module2_name / f"base_{module2_name}.py"
-        module2_content = '''from invoker import Module
+        module2_content = '''from invoker import InvokerModule
 
 
-class BaseTransformer(Module):
+class BaseTransformer(InvokerModule):
     @classmethod
     def args(cls):
         args = super().args()
@@ -785,17 +787,19 @@ class BaseTransformer(Module):
         script_file = temp_project_dir / f"{script_name}.py"
         
         script_content = '''#!/usr/bin/env python
-from invoker import Script
+from invoker import InvokerScript
+from loader.base_loader import BaseLoader
+from transformer.base_transformer import BaseTransformer
 import json
 
 
-class Pipeline(Script):
+class Pipeline(InvokerScript):
     @classmethod
     def modules(cls):
         mods = super().modules()
         mods.update(dict(
-            loader="base",
-            transformer="base"
+            loader=BaseLoader,
+            transformer=BaseTransformer
         ))
         return mods
 
@@ -849,10 +853,10 @@ if __name__ == "__main__":
         project.create_module(module_name)
         
         module_base_file = temp_project_dir / module_name / f"base_{module_name}.py"
-        module_content = '''from invoker import Module
+        module_content = '''from invoker import InvokerModule
 
 
-class BaseFilter(Module):
+class BaseFilter(InvokerModule):
     @classmethod
     def args(cls):
         args = super().args()
@@ -872,16 +876,17 @@ class BaseFilter(Module):
         script_file = temp_project_dir / f"{script_name}.py"
         
         script_content = '''#!/usr/bin/env python
-from invoker import Script
+from invoker import InvokerScript
+from filter.base_filter import BaseFilter
 import json
 
 
-class FilterData(Script):
+class FilterData(InvokerScript):
     @classmethod
     def modules(cls):
         mods = super().modules()
         mods.update(dict(
-            filter="base"
+            filter=BaseFilter
         ))
         return mods
 
@@ -932,10 +937,10 @@ if __name__ == "__main__":
         project.create_module(module_name)
         
         module_base_file = temp_project_dir / module_name / f"base_{module_name}.py"
-        module_content = '''from invoker import Module
+        module_content = '''from invoker import InvokerModule
 
 
-class BaseValidator(Module):
+class BaseValidator(InvokerModule):
     @classmethod
     def args(cls):
         args = super().args()
@@ -956,16 +961,17 @@ class BaseValidator(Module):
         script_file = temp_project_dir / f"{script_name}.py"
         
         script_content = '''#!/usr/bin/env python
-from invoker import Script
+from invoker import InvokerScript
+from validator.base_validator import BaseValidator
 import json
 
 
-class Validate(Script):
+class Validate(InvokerScript):
     @classmethod
     def modules(cls):
         mods = super().modules()
         mods.update(dict(
-            validator="base"
+            validator=BaseValidator
         ))
         return mods
 
@@ -1020,10 +1026,10 @@ if __name__ == "__main__":
         project.create_module(module_name)
         
         module_base_file = temp_project_dir / module_name / f"base_{module_name}.py"
-        module_content = '''from invoker import Module
+        module_content = '''from invoker import InvokerModule
 
 
-class BaseEngine(Module):
+class BaseEngine(InvokerModule):
     @classmethod
     def args(cls):
         args = super().args()
@@ -1043,11 +1049,12 @@ class BaseEngine(Module):
         script_file = temp_project_dir / f"{script_name}.py"
         
         script_content = '''#!/usr/bin/env python
-from invoker import Script
+from invoker import InvokerScript
+from engine.base_engine import BaseEngine
 import json
 
 
-class Compute(Script):
+class Compute(InvokerScript):
     @classmethod
     def args(cls):
         args = super().args()
@@ -1061,7 +1068,7 @@ class Compute(Script):
     def modules(cls):
         mods = super().modules()
         mods.update(dict(
-            engine="base"
+            engine=BaseEngine
         ))
         return mods
 
