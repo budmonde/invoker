@@ -1,6 +1,6 @@
 from datetime import date
 from importlib import metadata
-from importlib.resources import files
+from pathlib import Path
 import hashlib
 
 
@@ -10,8 +10,12 @@ def _compute_hash(string):
     return hasher.hexdigest()
 
 
+def _get_resources_path():
+    return Path(__file__).parent / "resources"
+
+
 def compute_resource_hash(resource_fn):
-    resource_files = files("resources")
+    resource_files = _get_resources_path()
     with (resource_files / resource_fn).open('rb') as f:
         return _compute_hash(f.read())
 
@@ -38,7 +42,7 @@ GENERATED_MESSAGE = f"""\
 
 
 def copy_resource(src_fn, dst_path, sign=False, preprocess_fn=lambda l: l):
-    resource_files = files("resources")
+    resource_files = _get_resources_path()
     with (resource_files / src_fn).open('rb') as f:
         file_hash = _compute_hash(f.read())
     with (resource_files / src_fn).open('r', encoding='utf-8') as inf, open(dst_path, "w") as outf:

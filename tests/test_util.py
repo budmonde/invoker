@@ -8,6 +8,7 @@ from importlib import metadata
 
 from util import (
     _compute_hash,
+    _get_resources_path,
     compute_resource_hash,
     compute_file_hash,
     copy_resource,
@@ -99,6 +100,20 @@ class TestComputeResourceHash:
         hash2 = compute_resource_hash("script.resource.py")
         
         assert hash1 != hash2, "Different resources should have different hashes"
+    
+    def test_compute_resource_hash_file_based_path(self):
+        """Test that compute_resource_hash uses file-based path resolution."""
+        # This test verifies that resources are found using __file__ based path
+        # which works reliably across all installation types
+        result = compute_resource_hash("invoker.resource.py")
+        
+        assert isinstance(result, str), "Hash should be a string"
+        assert len(result) == 32, "MD5 hash should be 32 characters"
+        
+        # Verify the path resolution works by checking _get_resources_path
+        resources_path = _get_resources_path()
+        assert (resources_path / "invoker.resource.py").exists(), \
+            "Resource file should be accessible via file-based path"
 
 
 class TestComputeFileHash:
@@ -255,9 +270,8 @@ class TestCopyResource:
         dest_file = temp_project_dir / "preserved.py"
         copy_resource("script.resource.py", dest_file, sign=False)
         
-        # Read both source and destination
-        from importlib.resources import files
-        resource_files = files("resources")
+        # Read both source and destination using the helper
+        resource_files = _get_resources_path()
         with (resource_files / "script.resource.py").open('r', encoding='utf-8') as f:
             original_content = f.read()
         
@@ -266,6 +280,30 @@ class TestCopyResource:
         
         assert original_content == copied_content, \
             "Content should be preserved when not signing"
+    
+    def test_copy_resource_file_based_path(self, temp_project_dir):
+        """Test that copy_resource uses file-based path resolution."""
+        # This test verifies that resources are copied using __file__ based path
+        # which works reliably across all installation types
+        dest_file = temp_project_dir / "file_based_test.py"
+        
+        copy_resource("script.resource.py", dest_file, sign=True)
+        
+        # Verify file was created
+        assert dest_file.exists(), "File should be created using file-based path"
+        
+        # Verify content
+        with open(dest_file, "r") as f:
+            content = f.read()
+        
+        assert "from invoker import InvokerScript" in content, \
+            "Should contain correct imports"
+        assert "# Hash:" in content, "Should contain hash when signed"
+        
+        # Verify the resources path exists
+        resources_path = _get_resources_path()
+        assert (resources_path / "script.resource.py").exists(), \
+            "Resource file should be accessible"
 
 
 class TestToCamelCase:
