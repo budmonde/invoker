@@ -132,7 +132,7 @@ class InvokerScript:
 
     @classmethod
     def build_config(cls, args):
-        return args
+        return args.copy()
 
     def run(self):
         logging.info("Running script %s", type(self).__name__)
@@ -302,7 +302,7 @@ class InvokerModule:
 
     @classmethod
     def build_config(cls, args):
-        return args
+        return args.copy()
 
 
 def _serialize_opt(opt):
