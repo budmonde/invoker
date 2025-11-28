@@ -149,7 +149,7 @@ class TestRebuild:
         
         # Verify hash was corrected
         stored_hash, computed_hash = compute_file_hash(invoker_file)
-        resource_hash = compute_resource_hash("invoker.resource.py")
+        resource_hash = compute_resource_hash("invoker.py")
         
         assert stored_hash == resource_hash, \
             "Hash should be corrected after rebuild"
@@ -179,7 +179,7 @@ class TestRebuild:
         
         # File should be updated with new content from resource
         stored_hash_after, computed_hash_after = compute_file_hash(invoker_file)
-        resource_hash = compute_resource_hash("invoker.resource.py")
+        resource_hash = compute_resource_hash("invoker.py")
         
         # After rebuild, hashes should match the actual resource
         assert stored_hash_after == resource_hash, \

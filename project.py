@@ -24,7 +24,7 @@ class Project:
     def initialize(self):
         if self.invoker_path.exists():
             raise_error(f"invoker module already exists at {self.invoker_path}!")
-        copy_resource("invoker.resource.py", self.invoker_path, sign=True)
+        copy_resource("invoker.py", self.invoker_path, sign=True)
         self.project_version = metadata.version('invoker')
         self.validate()
         return self
@@ -85,7 +85,7 @@ class Project:
         # Add boilerplate module base class resource
         module_base_path = module_path / f"base_{module_name}.py"
         copy_resource(
-            "module_base.resource.py",
+            "module_base.py",
             module_base_path,
             preprocess_fn=lambda l: l.replace("__MODULE__", to_camel_case(module_name)),
         )
@@ -99,7 +99,7 @@ class Project:
         if script_path.exists():
             raise_error(f"script already exists at {script_path}!")
         copy_resource(
-            "script.resource.py",
+            "script.py",
             script_path,
             preprocess_fn=lambda l: l.replace("__SCRIPT__", to_camel_case(script_name)),
         )
@@ -129,7 +129,7 @@ class Project:
 
     def rebuild(self):
         self.check_version(error_on_mismatch=True)
-        self._rebuild_resource("invoker.resource.py", self.invoker_path, sign=True)
+        self._rebuild_resource("invoker.py", self.invoker_path, sign=True)
 
     def _rebuild_resource(self, resource_name, path, sign=False):
         if not path.exists():

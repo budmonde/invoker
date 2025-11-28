@@ -67,37 +67,37 @@ class TestComputeResourceHash:
     """Test suite for compute_resource_hash function."""
     
     def test_compute_resource_hash_invoker(self):
-        """Test computing hash of invoker.resource.py."""
-        result = compute_resource_hash("invoker.resource.py")
+        """Test computing hash of invoker.py."""
+        result = compute_resource_hash("invoker.py")
         
         assert isinstance(result, str), "Hash should be a string"
         assert len(result) == 32, "MD5 hash should be 32 characters"
     
     def test_compute_resource_hash_script(self):
-        """Test computing hash of script.resource.py."""
-        result = compute_resource_hash("script.resource.py")
+        """Test computing hash of script.py."""
+        result = compute_resource_hash("script.py")
         
         assert isinstance(result, str), "Hash should be a string"
         assert len(result) == 32, "MD5 hash should be 32 characters"
     
     def test_compute_resource_hash_module_base(self):
-        """Test computing hash of module_base.resource.py."""
-        result = compute_resource_hash("module_base.resource.py")
+        """Test computing hash of module_base.py."""
+        result = compute_resource_hash("module_base.py")
         
         assert isinstance(result, str), "Hash should be a string"
         assert len(result) == 32, "MD5 hash should be 32 characters"
     
     def test_compute_resource_hash_consistent(self):
         """Test that computing hash multiple times returns same result."""
-        hash1 = compute_resource_hash("invoker.resource.py")
-        hash2 = compute_resource_hash("invoker.resource.py")
+        hash1 = compute_resource_hash("invoker.py")
+        hash2 = compute_resource_hash("invoker.py")
         
         assert hash1 == hash2, "Should return consistent hash for same resource"
     
     def test_compute_resource_hash_different_resources(self):
         """Test that different resources have different hashes."""
-        hash1 = compute_resource_hash("invoker.resource.py")
-        hash2 = compute_resource_hash("script.resource.py")
+        hash1 = compute_resource_hash("invoker.py")
+        hash2 = compute_resource_hash("script.py")
         
         assert hash1 != hash2, "Different resources should have different hashes"
     
@@ -105,14 +105,14 @@ class TestComputeResourceHash:
         """Test that compute_resource_hash uses file-based path resolution."""
         # This test verifies that resources are found using __file__ based path
         # which works reliably across all installation types
-        result = compute_resource_hash("invoker.resource.py")
+        result = compute_resource_hash("invoker.py")
         
         assert isinstance(result, str), "Hash should be a string"
         assert len(result) == 32, "MD5 hash should be 32 characters"
         
         # Verify the path resolution works by checking _get_resources_path
         resources_path = _get_resources_path()
-        assert (resources_path / "invoker.resource.py").exists(), \
+        assert (resources_path / "invoker.py").exists(), \
             "Resource file should be accessible via file-based path"
 
 
@@ -175,7 +175,7 @@ class TestCopyResource:
     def test_copy_resource_basic(self, temp_project_dir):
         """Test basic resource copying without signing."""
         dest_file = temp_project_dir / "copied_script.py"
-        copy_resource("script.resource.py", dest_file, sign=False)
+        copy_resource("script.py", dest_file, sign=False)
         
         assert dest_file.exists(), "Destination file should be created"
         
@@ -190,7 +190,7 @@ class TestCopyResource:
     def test_copy_resource_with_signing(self, temp_project_dir):
         """Test resource copying with signing."""
         dest_file = temp_project_dir / "signed_file.py"
-        copy_resource("invoker.resource.py", dest_file, sign=True)
+        copy_resource("invoker.py", dest_file, sign=True)
         
         assert dest_file.exists(), "Destination file should be created"
         
@@ -215,10 +215,10 @@ class TestCopyResource:
     def test_copy_resource_signed_hash_integrity(self, temp_project_dir):
         """Test that signed resource has correct hash."""
         dest_file = temp_project_dir / "hashed_file.py"
-        copy_resource("module_base.resource.py", dest_file, sign=True)
+        copy_resource("module_base.py", dest_file, sign=True)
         
         # Compute resource hash
-        resource_hash = compute_resource_hash("module_base.resource.py")
+        resource_hash = compute_resource_hash("module_base.py")
         
         # Compute file hash
         stored_hash, computed_hash = compute_file_hash(dest_file)
@@ -237,7 +237,7 @@ class TestCopyResource:
             return line.replace("__MODULE__", "TestModule")
         
         copy_resource(
-            "module_base.resource.py",
+            "module_base.py",
             dest_file,
             sign=False,
             preprocess_fn=replace_placeholder
@@ -255,7 +255,7 @@ class TestCopyResource:
     def test_copy_resource_version_in_header(self, temp_project_dir):
         """Test that signed resource has correct version in header."""
         dest_file = temp_project_dir / "versioned.py"
-        copy_resource("invoker.resource.py", dest_file, sign=True)
+        copy_resource("invoker.py", dest_file, sign=True)
         
         with open(dest_file, "r") as f:
             first_line = f.readline()
@@ -268,11 +268,11 @@ class TestCopyResource:
     def test_copy_resource_preserves_content(self, temp_project_dir):
         """Test that resource content is preserved during copy."""
         dest_file = temp_project_dir / "preserved.py"
-        copy_resource("script.resource.py", dest_file, sign=False)
+        copy_resource("script.py", dest_file, sign=False)
         
         # Read both source and destination using the helper
         resource_files = _get_resources_path()
-        with (resource_files / "script.resource.py").open('r', encoding='utf-8') as f:
+        with (resource_files / "script.py").open('r', encoding='utf-8') as f:
             original_content = f.read()
         
         with open(dest_file, "r") as f:
@@ -287,7 +287,7 @@ class TestCopyResource:
         # which works reliably across all installation types
         dest_file = temp_project_dir / "file_based_test.py"
         
-        copy_resource("script.resource.py", dest_file, sign=True)
+        copy_resource("script.py", dest_file, sign=True)
         
         # Verify file was created
         assert dest_file.exists(), "File should be created using file-based path"
@@ -302,7 +302,7 @@ class TestCopyResource:
         
         # Verify the resources path exists
         resources_path = _get_resources_path()
-        assert (resources_path / "script.resource.py").exists(), \
+        assert (resources_path / "script.py").exists(), \
             "Resource file should be accessible"
 
 

@@ -62,7 +62,7 @@ class TestInit:
         assert hash_line_found, "File should contain hash signature in header"
         
         # Verify hash integrity
-        resource_hash = compute_resource_hash("invoker.resource.py")
+        resource_hash = compute_resource_hash("invoker.py")
         cached_hash, computed_hash = compute_file_hash(invoker_file)
         
         assert cached_hash == resource_hash, "Cached hash should match the resource hash"
