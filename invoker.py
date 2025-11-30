@@ -38,6 +38,17 @@ def create():
     pass
 
 
+@cli.command(name="import")
+@click.argument("resource_path")
+@click.option("--dest", "dest_path", default=None, help="Optional destination relative path in project")
+def import_cmd(resource_path, dest_path):
+    click.secho(f"Importing {resource_path}...", fg="yellow")
+    project = Project(Path())
+    project.load()
+    project.import_resource(resource_path, dest_rel_path=dest_path)
+    click.secho("Success!", fg="green")
+
+
 @create.command()
 @click.argument("module_name")
 def module(module_name):

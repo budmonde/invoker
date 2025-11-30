@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from project import Project
 import pytest
-from util import compute_resource_hash, compute_file_hash, copy_resource
+from resource_manager import ResourceManager
 
 
 class TestRebuild:
@@ -148,8 +148,8 @@ class TestRebuild:
         project.rebuild()
         
         # Verify hash was corrected
-        stored_hash, computed_hash = compute_file_hash(invoker_file)
-        resource_hash = compute_resource_hash("invoker.py")
+        stored_hash, computed_hash = ResourceManager.compute_file_hash(invoker_file)
+        resource_hash = ResourceManager.compute_resource_hash("invoker.py")
         
         assert stored_hash == resource_hash, \
             "Hash should be corrected after rebuild"
@@ -165,7 +165,7 @@ class TestRebuild:
         invoker_file = temp_project_dir / "invoker.py"
         
         # Verify file has matching hashes (no user modifications)
-        stored_hash, computed_hash = compute_file_hash(invoker_file)
+        stored_hash, computed_hash = ResourceManager.compute_file_hash(invoker_file)
         assert stored_hash == computed_hash, \
             "File should have no user modifications"
         
@@ -173,13 +173,13 @@ class TestRebuild:
         # This simulates the resource template being updated (e.g., CLI tool upgrade)
         fake_new_resource_hash = "newresourcehash1234567890abcdef123"
         
-        with patch('project.compute_resource_hash', return_value=fake_new_resource_hash):
+        with patch('resource_manager.ResourceManager.compute_resource_hash', return_value=fake_new_resource_hash):
             # Rebuild should detect hash mismatch and update the file
             project.rebuild()
         
         # File should be updated with new content from resource
-        stored_hash_after, computed_hash_after = compute_file_hash(invoker_file)
-        resource_hash = compute_resource_hash("invoker.py")
+        stored_hash_after, computed_hash_after = ResourceManager.compute_file_hash(invoker_file)
+        resource_hash = ResourceManager.compute_resource_hash("invoker.py")
         
         # After rebuild, hashes should match the actual resource
         assert stored_hash_after == resource_hash, \

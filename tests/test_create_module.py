@@ -6,7 +6,7 @@ from importlib import metadata
 
 from project import Project
 import pytest
-from util import compute_resource_hash, compute_file_hash, to_camel_case
+from util import to_camel_case
 
 
 class TestCreateModule:

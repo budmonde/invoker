@@ -4,16 +4,8 @@ import re
 import click
 import subprocess
 
-from util import copy_resource, compute_resource_hash, compute_file_hash, to_camel_case
-
-def raise_error(message):
-    click.secho("Invoker Error: ", err=True, nl=False, fg="red")
-    click.echo(message, err=True)
-    raise SystemExit(1)
-
-def warn(message):
-    click.secho("Invoker Warning: ", err=True, nl=False, fg="yellow")
-    click.echo(message, err=True)
+from resource_manager import ResourceManager
+from util import to_camel_case, raise_error, warn
 
 class Project:
     def __init__(self, root_path):
@@ -24,7 +16,7 @@ class Project:
     def initialize(self):
         if self.invoker_path.exists():
             raise_error(f"invoker module already exists at {self.invoker_path}!")
-        copy_resource("invoker.py", self.invoker_path, sign=True)
+        ResourceManager.copy_resource("invoker.py", self.invoker_path, sign=True)
         self.project_version = metadata.version('invoker')
         self.validate()
         return self
@@ -84,7 +76,7 @@ class Project:
 
         # Add boilerplate module base class resource
         module_base_path = module_path / f"base_{module_name}.py"
-        copy_resource(
+        ResourceManager.copy_resource(
             "module_base.py",
             module_base_path,
             preprocess_fn=lambda l: l.replace("__MODULE__", to_camel_case(module_name)),
@@ -98,7 +90,7 @@ class Project:
         script_path = self.root_path / f"{script_name}.py"
         if script_path.exists():
             raise_error(f"script already exists at {script_path}!")
-        copy_resource(
+        ResourceManager.copy_resource(
             "script.py",
             script_path,
             preprocess_fn=lambda l: l.replace("__SCRIPT__", to_camel_case(script_name)),
@@ -127,6 +119,13 @@ class Project:
             raise_error(f"script does not exist at {script_path}!")
         subprocess.call(['python', 'invoker.py', 'debug', script_name_with_line_num])
 
+    def import_resource(self, resource_rel_path, dest_rel_path=None):
+        self.validate()
+        target_rel_path = dest_rel_path if dest_rel_path is not None else resource_rel_path
+        dest_path = self.root_path / target_rel_path
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        ResourceManager.copy_resource(resource_rel_path, dest_path, sign=True)
+
     def rebuild(self):
         self.check_version(error_on_mismatch=True)
         self._rebuild_resource("invoker.py", self.invoker_path, sign=True)
@@ -135,13 +134,13 @@ class Project:
         if not path.exists():
             raise_error(f"{resource_name} does not exist at {path}!")
 
-        resource_hash = compute_resource_hash(resource_name)
-        cached_hash, computed_hash = compute_file_hash(path)
+        resource_hash = ResourceManager.compute_resource_hash(resource_name)
+        cached_hash, computed_hash = ResourceManager.compute_file_hash(path)
         if cached_hash != computed_hash:
             backup_path = Path(str(path) + ".bak")
             path.rename(backup_path)
-            copy_resource(resource_name, path, sign=sign)
+            ResourceManager.copy_resource(resource_name, path, sign=sign)
             return
         if resource_hash != cached_hash:
-            copy_resource(resource_name, path, sign=sign)
+            ResourceManager.copy_resource(resource_name, path, sign=sign)
             return

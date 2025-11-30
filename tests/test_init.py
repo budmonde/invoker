@@ -5,7 +5,7 @@ from pathlib import Path
 from importlib import metadata
 
 from project import Project
-from util import compute_resource_hash, compute_file_hash
+from resource_manager import ResourceManager
 
 
 class TestInit:
@@ -62,8 +62,8 @@ class TestInit:
         assert hash_line_found, "File should contain hash signature in header"
         
         # Verify hash integrity
-        resource_hash = compute_resource_hash("invoker.py")
-        cached_hash, computed_hash = compute_file_hash(invoker_file)
+        resource_hash = ResourceManager.compute_resource_hash("invoker.py")
+        cached_hash, computed_hash = ResourceManager.compute_file_hash(invoker_file)
         
         assert cached_hash == resource_hash, "Cached hash should match the resource hash"
         assert computed_hash == resource_hash, "Computed hash should match the resource hash"
