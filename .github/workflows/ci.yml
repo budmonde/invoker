@@ -25,6 +25,10 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -e ".[test]"
+        # Install image processing test dependencies
+        pip install numpy imageio
+        # Install CPU-only PyTorch for CI
+        pip install --index-url https://download.pytorch.org/whl/cpu torch
     
     - name: Run tests
       run: |
