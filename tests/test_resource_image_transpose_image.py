@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from resources.image import transpose_image
+from resources.util.image import transpose_image
 
 
 def make_np(shape):

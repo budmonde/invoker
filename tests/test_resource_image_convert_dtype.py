@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from resources.image import convert_dtype
+from resources.util.image import convert_dtype
 
 
 def make_np(shape, dtype=np.float32):
