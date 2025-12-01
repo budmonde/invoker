@@ -19,7 +19,6 @@ class ResourceManager:
 #
 # This script was generated with invoker.
 # To regenerate file, run `invoker rebuild`.
-# Date:\t{date.today().strftime("%Y-%m-%d")}
 """
 
     @staticmethod
@@ -80,6 +79,8 @@ class ResourceManager:
         with resource_path.open("r", encoding="utf-8") as inf, open(dst_path, "w") as outf:
             if sign:
                 outf.write(cls.GENERATED_MESSAGE)
+                outf.write(f"# Invoker resource: {src_rel_path}\n")
+                outf.write(f"# Date: {date.today().strftime('%Y-%m-%d')}\n")
                 outf.write(f"# Hash:\t{file_hash}\n")
             for line in inf:
                 outf.write(preprocess_fn(line))

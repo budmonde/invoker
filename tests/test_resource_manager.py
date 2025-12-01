@@ -193,6 +193,28 @@ class TestCopyResource:
             "First line should have version header"
         assert "# DO NOT MANUALLY EDIT THIS FILE." in lines[1], \
             "Should have DO NOT EDIT warning"
+        # Resource path and date lines
+        assert any(line.startswith("# Invoker resource: invoker.py") for line in lines[:10]), \
+            "Header should contain invoker resource path"
+        assert any(line.startswith("# Date: ") for line in lines[:10]), \
+            "Header should contain date line"
+
+    def test_copy_resource_header_matches_resource_and_date(self, temp_project_dir):
+        """Header should include exact resource path and today's date."""
+        resource_rel_path = "util/image.py"
+        dest_file = temp_project_dir / "signed_image_util.py"
+        ResourceManager.copy_resource(resource_rel_path, dest_file, sign=True)
+
+        with open(dest_file, "r") as f:
+            lines = f.readlines()
+
+        expected_resource_line = f"# Invoker resource: {resource_rel_path}\n"
+        expected_date_line = f"# Date: {date.today().strftime('%Y-%m-%d')}\n"
+
+        assert expected_resource_line in lines[:10], \
+            "Header should contain exact invoker resource path for copied file"
+        assert expected_date_line in lines[:10], \
+            "Header should contain today's date in YYYY-MM-DD format"
         
         # Find hash line
         hash_found = False
@@ -317,15 +339,6 @@ class TestGeneratedMessage:
         """Test that GENERATED_MESSAGE contains rebuild instruction."""
         assert "invoker rebuild" in ResourceManager.GENERATED_MESSAGE, \
             "Should contain rebuild instruction"
-    
-    def test_generated_message_has_date(self):
-        """Test that GENERATED_MESSAGE contains date information."""
-        assert "Date:" in ResourceManager.GENERATED_MESSAGE, "Should contain date field"
-        
-        # Verify date format (YYYY-MM-DD)
-        today = date.today().strftime("%Y-%m-%d")
-        assert today in ResourceManager.GENERATED_MESSAGE, \
-            "Should contain today's date in YYYY-MM-DD format"
     
     def test_generated_message_is_comment_block(self):
         """Test that GENERATED_MESSAGE is properly formatted as comments."""
