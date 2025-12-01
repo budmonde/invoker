@@ -1,7 +1,6 @@
 import imageio.v3 as iio
 import numpy as np
 import torch
-import warnings
 
 
 INFERRED_EOTF_FROM_DTYPE = {

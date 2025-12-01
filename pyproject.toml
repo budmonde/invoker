@@ -29,4 +29,7 @@ docs = [
 invoker = "invoker:cli"
 
 [tool.setuptools]
-py-modules = ["invoker", "project", "util", "resources"]
+py-modules = ["invoker", "project", "util", "resource_manager"]
+
+[tool.setuptools.packages.find]
+include = ["resources*"]
