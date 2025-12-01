@@ -49,8 +49,11 @@ class ResourceManager:
     @classmethod
     def compute_resource_hash(cls, resource_rel_path: str) -> str:
         resource_path = cls._resolve_resource_path(resource_rel_path)
-        with resource_path.open("rb") as f:
-            return cls._compute_hash(f.read())
+        try:
+            with resource_path.open("rb") as f:
+                return cls._compute_hash(f.read())
+        except FileNotFoundError:
+            raise_error(f"Resource not found: {resource_rel_path}")
 
     @classmethod
     def compute_file_hash(cls, path: Path) -> tuple[str, str]:
@@ -64,6 +67,24 @@ class ResourceManager:
             stored_hash = hash_line.strip().split("\t")[1]
             computed_hash = cls._compute_hash(f.read().encode("ascii"))
         return stored_hash, computed_hash
+
+    @classmethod
+    def extract_resource_path_from_file(cls, path: Path) -> str | None:
+        """
+        Parse the generated file header to extract the resource relative path, if present.
+        Returns the resource path string or None if not found.
+        """
+        try:
+            with open(path, "r") as f:
+                for _ in range(20):
+                    line = f.readline()
+                    if not line:
+                        break
+                    if line.startswith("# Invoker resource: "):
+                        return line.split(": ", 1)[1].strip()
+            return None
+        except FileNotFoundError:
+            return None
 
     @classmethod
     def copy_resource(

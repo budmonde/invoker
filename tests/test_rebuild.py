@@ -192,6 +192,58 @@ class TestRebuild:
         assert not backup_file.exists(), \
             "No backup should be created when hashes match (no user modifications)"
     
+    def test_rebuild_modified_util_image_creates_backup(self, temp_project_dir):
+        """Rebuild should restore modified util/image.py and create a backup."""
+        project = Project(temp_project_dir)
+        project.initialize()
+        
+        # Import util/image.py into project
+        project.import_resource("util/image.py")
+        image_util = temp_project_dir / "util" / "image.py"
+        
+        # Modify the file to simulate user change
+        with open(image_util, "r") as f:
+            lines = f.readlines()
+        with open(image_util, "w") as f:
+            f.writelines(lines)
+            f.write("\n# user modification\n")
+        
+        # Rebuild should create a backup and restore from resource
+        project.rebuild()
+        
+        backup_file = Path(str(image_util) + ".bak")
+        assert backup_file.exists(), "Backup should be created for modified util/image.py"
+        with open(backup_file, "r") as f:
+            backup_content = f.read()
+        assert "user modification" in backup_content, "Backup should contain user modification"
+        
+        with open(image_util, "r") as f:
+            restored_content = f.read()
+        assert "user modification" not in restored_content, "Restored file should not contain user modification"
+    
+    def test_rebuild_nonexistent_resource_in_header_raises(self, temp_project_dir, capfd):
+        """Rebuild should fail clearly if a generated file references a missing resource."""
+        project = Project(temp_project_dir)
+        project.initialize()
+        
+        ghost = temp_project_dir / "ghost.py"
+        body = "print('ghost')\n"
+        stored_hash = ResourceManager._compute_hash(body.encode('ascii'))
+        
+        with open(ghost, "w") as f:
+            f.write(ResourceManager.GENERATED_MESSAGE)
+            f.write("# Invoker resource: util/does_not_exist.py\n")
+            from datetime import date
+            f.write(f"# Date: {date.today().strftime('%Y-%m-%d')}\n")
+            f.write(f"# Hash:\t{stored_hash}\n")
+            f.write(body)
+        
+        with pytest.raises(SystemExit) as exc_info:
+            project.rebuild()
+        assert exc_info.value.code == 1
+        captured = capfd.readouterr()
+        assert "Resource not found: util/does_not_exist.py" in captured.err
+    
     def test_rebuild_preserves_correct_version(self, temp_project_dir):
         """Test that rebuild preserves files with correct version."""
         # Initialize project

@@ -128,7 +128,23 @@ class Project:
 
     def rebuild(self):
         self.check_version(error_on_mismatch=True)
-        self._rebuild_resource("invoker.py", self.invoker_path, sign=True)
+        for path in self.root_path.rglob("*.py"):
+            try:
+                with open(path, "r") as f:
+                    header = [next(f) for _ in range(5)]
+            except Exception:
+                continue
+            is_generated = False
+            for line in header:
+                if line.startswith("# Invoker: v"):
+                    is_generated = True
+                    break
+            if not is_generated:
+                continue
+            resource_name = ResourceManager.extract_resource_path_from_file(path)
+            if not resource_name:
+                continue
+            self._rebuild_resource(resource_name, path, sign=True)
 
     def _rebuild_resource(self, resource_name, path, sign=False):
         if not path.exists():
