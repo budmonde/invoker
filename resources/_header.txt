@@ -3,7 +3,7 @@
 #
 # This script was generated with invoker.
 # To regenerate file, run `invoker rebuild`.
-# Invoker resource: {resource}
+# Resource name: {resource}
 # Date: {date}
 # Hash:	{hash}
 

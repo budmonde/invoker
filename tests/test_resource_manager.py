@@ -222,7 +222,7 @@ class TestCopyResource:
         assert "# DO NOT MANUALLY EDIT THIS FILE." in lines[1], \
             "Should have DO NOT EDIT warning"
         # Resource path and date lines
-        assert any(line.startswith("# Invoker resource: invoker.py") for line in lines[:10]), \
+        assert any(line.startswith("# Resource name: invoker.py") for line in lines[:10]), \
             "Header should contain invoker resource path"
         assert any(line.startswith("# Date: ") for line in lines[:10]), \
             "Header should contain date line"
@@ -236,7 +236,7 @@ class TestCopyResource:
         with open(dest_file, "r") as f:
             lines = f.readlines()
 
-        expected_resource_line = f"# Invoker resource: {resource_rel_path}\n"
+        expected_resource_line = f"# Resource name: {resource_rel_path}\n"
         expected_date_line = f"# Date: {date.today().strftime('%Y-%m-%d')}\n"
 
         assert expected_resource_line in lines[:10], \
@@ -354,7 +354,7 @@ class TestInvokerHeaderOps:
         header_text = "".join(header_lines)
         assert "# Invoker: v" in header_text, "Header should contain version line"
         assert "# DO NOT MANUALLY EDIT THIS FILE." in header_text, "Header should contain warning"
-        assert "# Invoker resource: script.py" in header_text, "Header should contain resource path"
+        assert "# Resource name: script.py" in header_text, "Header should contain resource path"
         assert "# Date: " in header_text, "Header should contain date line"
         assert "# Hash:" in header_text, "Header should contain hash line"
 
