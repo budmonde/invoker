@@ -128,21 +128,18 @@ class TestRebuild:
         
         invoker_file = temp_project_dir / "invoker.py"
         
-        # Read the file and manually change the stored hash
-        with open(invoker_file, "r") as f:
-            lines = f.readlines()
-        
-        # Find and modify the hash line (should be near the top)
-        modified_lines = []
-        for line in lines:
-            if line.startswith("# Hash:"):
-                # Replace with a fake hash
-                modified_lines.append("# Hash:\tfakehash1234567890abcdef1234567\n")
-            else:
-                modified_lines.append(line)
-        
-        with open(invoker_file, "w") as f:
-            f.writelines(modified_lines)
+        # Replace the entire header with a valid header but fake hash
+        header_template = ResourceManager._get_header_template_path().read_text(encoding="utf-8")
+        header_text = header_template.format(
+            version=metadata.version('invoker'),
+            resource="invoker.py",
+            date="2099-01-01",
+            hash="0" * 32,
+        )
+        body_lines = ResourceManager.strip_invoker_header(invoker_file)
+        with open(invoker_file, "w", encoding="utf-8") as f:
+            f.write(header_text)
+            f.writelines(body_lines)
         
         # Rebuild should update the file (without backup since hashes don't match)
         project.rebuild()
@@ -191,6 +188,22 @@ class TestRebuild:
         backup_file = Path(str(invoker_file) + ".bak")
         assert not backup_file.exists(), \
             "No backup should be created when hashes match (no user modifications)"
+
+    def test_rebuild_warns_when_header_found_but_missing_resource(self, temp_project_dir, capfd, monkeypatch):
+        """Rebuild should warn when header is detected but resource name is missing."""
+        project = Project(temp_project_dir)
+        project.initialize()
+
+        target = temp_project_dir / "header_missing_resource.py"
+        target.write_text("# dummy\nprint('x')\n", encoding="utf-8")
+
+        # Simulate header present (7 lines) but no resource in parsed fields
+        monkeypatch.setattr("resource_manager.ResourceManager.parse_invoker_header", lambda p: (7, {"version": "0.0.0", "date": "2099-01-01", "hash": "0"*32}))
+
+        project.rebuild()
+
+        captured = capfd.readouterr()
+        assert "Missing resource name in header" in captured.err
     
     def test_rebuild_modified_util_image_creates_backup(self, temp_project_dir):
         """Rebuild should restore modified util/image.py and create a backup."""
@@ -231,12 +244,14 @@ class TestRebuild:
         stored_hash = ResourceManager._compute_hash(body.encode('ascii'))
         
         with open(ghost, "w") as f:
-            f.write(ResourceManager.GENERATED_MESSAGE)
-            f.write("# Invoker resource: util/does_not_exist.py\n")
-            from datetime import date
-            f.write(f"# Date: {date.today().strftime('%Y-%m-%d')}\n")
-            f.write(f"# Hash:\t{stored_hash}\n")
-            f.write(body)
+            header_template = ResourceManager._get_header_template_path().read_text(encoding="utf-8")
+            header_text = header_template.format(
+                version=metadata.version('invoker'),
+                resource="util/does_not_exist.py",
+                date="2099-01-01",
+                hash=stored_hash,
+            )
+            f.write(header_text + body)
         
         with pytest.raises(SystemExit) as exc_info:
             project.rebuild()
@@ -335,3 +350,16 @@ class TestRebuild:
         # Should be the same
         assert files_before == files_after, \
             "Rebuild should not create or remove files when no changes needed"
+
+    def test__rebuild_resource_missing_path_raises(self, temp_project_dir):
+        """Directly calling _rebuild_resource with a non-existent path should raise."""
+        project = Project(temp_project_dir)
+        project.initialize()
+
+        missing_path = temp_project_dir / "does_not_exist.py"
+        assert not missing_path.exists()
+
+        import pytest
+        with pytest.raises(SystemExit) as exc_info:
+            project._rebuild_resource("script.py", missing_path, sign=True)
+        assert exc_info.value.code == 1

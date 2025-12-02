@@ -139,20 +139,12 @@ class Project:
     def rebuild(self):
         self.check_version(error_on_mismatch=True)
         for path in self.root_path.rglob("*.py"):
-            try:
-                with open(path, "r") as f:
-                    header = [next(f) for _ in range(5)]
-            except Exception:
+            header_num_lines, fields = ResourceManager.parse_invoker_header(path)
+            if header_num_lines == 0:
                 continue
-            is_generated = False
-            for line in header:
-                if line.startswith("# Invoker: v"):
-                    is_generated = True
-                    break
-            if not is_generated:
-                continue
-            resource_name = ResourceManager.extract_resource_path_from_file(path)
+            resource_name = fields.get("resource")
             if not resource_name:
+                warn(f"Missing resource name in header for '{path}'. Skipping.")
                 continue
             self._rebuild_resource(resource_name, path, sign=True)
 

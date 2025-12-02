@@ -1,5 +1,7 @@
 """Integration tests for utility functions in util.py."""
 from util import to_camel_case
+import util
+import pytest
 
 
 class TestToCamelCase:
@@ -60,3 +62,19 @@ class TestToCamelCase:
         assert to_camel_case("data_processor") == "DataProcessor"
         assert to_camel_case("neural_network_model") == "NeuralNetworkModel"
         assert to_camel_case("image_augmentation") == "ImageAugmentation"
+
+
+class TestIsEditableInstall:
+    """Test suite for is_editable_install heuristic."""
+
+    def test_is_editable_install_true_for_dev_paths(self, monkeypatch):
+        # Simulate repository-style path (no site-packages/dist-packages in parents)
+        fake_util_path = "/home/user/dev/invoker/util.py"
+        monkeypatch.setattr(util, "__file__", fake_util_path, raising=False)
+        assert util.is_editable_install() is True
+
+    def test_is_editable_install_false_for_site_packages(self, monkeypatch):
+        # Simulate installed package path under site-packages
+        fake_util_path = "/usr/lib/python3.11/site-packages/invoker/util.py"
+        monkeypatch.setattr(util, "__file__", fake_util_path, raising=False)
+        assert util.is_editable_install() is False

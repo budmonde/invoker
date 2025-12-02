@@ -21,7 +21,7 @@ def convert_eotf(image, input_eotf, output_eotf):
     return EOTF_TABLE[(input_eotf, output_eotf)](image)
 
 class Image:
-    def __init__(self, image, dim_labels, eotf=None, label=None):
+    def __init__(self, image, eotf, dim_labels, label=None):
         self.image = image
         self.eotf = eotf
         self.dim_labels = dim_labels
@@ -30,25 +30,25 @@ class Image:
         if len(image.shape) != len(dim_labels):
             raise ValueError("Image shape %s does not match dim labels %s" % (image.shape, dim_labels))
 
-        # Determine input EOTF (Electronic Optical Transfer Function)
-        if eotf is None:
-            if self.image.dtype in INFERRED_EOTF_FROM_DTYPE:
-                self.eotf = INFERRED_EOTF_FROM_DTYPE[self.image.dtype]
-            else:
-                raise ValueError("Unsupported image dtype: %s" % self.image.dtype)
-        else:
-            self.eotf = eotf
-
     @classmethod
     def read(self, path, eotf=None):
         arr = iio.imread(path)
-        if arr.dtype == np.uint8:
+        dtype = arr.dtype.type
+
+        if eotf is None:
+            if dtype in INFERRED_EOTF_FROM_DTYPE:
+                eotf = INFERRED_EOTF_FROM_DTYPE[dtype]
+            else:
+                raise ValueError("Cannot infer EOTF from dtype: %s. Specify EOTF explicitly." % dtype)
+
+        if dtype == np.uint8:
             arr = arr.astype(np.float32) / 255.0
-        elif arr.dtype == np.float32:
+        elif dtype == np.float32:
             pass
         else:
-            raise ValueError("Unsupported image dtype: %s" % self.image.dtype)
-        return Image(arr, dim_labels="HWC", eotf=eotf, label=path)
+            raise ValueError("Unsupported image dtype: %s" % dtype)
+
+        return Image(arr, eotf=eotf, dim_labels="HWC", label=path)
 
     def get(self, eotf='linear', dim_labels='BHWC', dtype=np.float32, device='cpu'):
         output = convert_eotf(self.image, self.eotf, eotf)

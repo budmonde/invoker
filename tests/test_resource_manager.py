@@ -1,10 +1,12 @@
 """Integration tests for utility functions in resource_manager.py."""
 import hashlib
 from datetime import date
+import pytest
 
 from importlib import metadata
 
 from resource_manager import ResourceManager
+import os
 
 
 class TestComputeHash:
@@ -111,14 +113,20 @@ class TestComputeFileHash:
     
     def test_compute_file_hash_with_hash_header(self, temp_project_dir):
         """Test computing hash of a file with hash header."""
-        # Create a test file with hash header
+        # Create a test file with proper invoker header
         test_file = temp_project_dir / "test_file.py"
         test_content = "print('Hello, World!')"
         test_hash = ResourceManager._compute_hash(test_content.encode('ascii'))
         
         with open(test_file, "w") as f:
-            f.write(f"# Hash:\t{test_hash}\n")
-            f.write(test_content)
+            header_template = ResourceManager._get_header_template_path().read_text(encoding="utf-8")
+            header_text = header_template.format(
+                version=metadata.version('invoker'),
+                resource="util/test_file.py",
+                date=date.today().strftime("%Y-%m-%d"),
+                hash=test_hash,
+            )
+            f.write(header_text + test_content)
         
         # Compute hash
         stored_hash, computed_hash = ResourceManager.compute_file_hash(test_file)
@@ -129,14 +137,20 @@ class TestComputeFileHash:
     
     def test_compute_file_hash_modified_content(self, temp_project_dir):
         """Test that modified content produces different computed hash."""
-        # Create a test file with hash header
+        # Create a test file with proper invoker header
         test_file = temp_project_dir / "test_file.py"
         original_content = "print('Hello')"
         original_hash = ResourceManager._compute_hash(original_content.encode('ascii'))
         
         with open(test_file, "w") as f:
-            f.write(f"# Hash:\t{original_hash}\n")
-            f.write("print('Modified content')")
+            header_template = ResourceManager._get_header_template_path().read_text(encoding="utf-8")
+            header_text = header_template.format(
+                version=metadata.version('invoker'),
+                resource="util/test_file.py",
+                date=date.today().strftime("%Y-%m-%d"),
+                hash=original_hash,
+            )
+            f.write(header_text + "print('Modified content')")
         
         # Compute hash
         stored_hash, computed_hash = ResourceManager.compute_file_hash(test_file)
@@ -151,12 +165,26 @@ class TestComputeFileHash:
         content_hash = ResourceManager._compute_hash(content.encode('ascii'))
         
         with open(test_file, "w") as f:
-            f.write(f"# Hash:\t{content_hash}\n")
-            f.write(content)
+            header_template = ResourceManager._get_header_template_path().read_text(encoding="utf-8")
+            header_text = header_template.format(
+                version=metadata.version('invoker'),
+                resource="util/multiline.py",
+                date=date.today().strftime("%Y-%m-%d"),
+                hash=content_hash,
+            )
+            f.write(header_text + content)
         
         stored_hash, computed_hash = ResourceManager.compute_file_hash(test_file)
         
         assert stored_hash == computed_hash, "Hashes should match for multiline content"
+
+    def test_compute_file_hash_no_header_raises(self, temp_project_dir):
+        """Calling compute_file_hash on a file without header should raise."""
+        test_file = temp_project_dir / "no_header.py"
+        test_file.write_text("print('no header here')\n", encoding="utf-8")
+        with pytest.raises(SystemExit) as exc_info:
+            ResourceManager.compute_file_hash(test_file)
+        assert exc_info.value.code == 1
 
 
 class TestCopyResource:
@@ -318,34 +346,85 @@ class TestCopyResource:
             "Resource file should be accessible"
 
 
-class TestGeneratedMessage:
-    """Test suite for GENERATED_MESSAGE constant."""
-    
-    def test_generated_message_has_version(self):
-        """Test that GENERATED_MESSAGE contains version information."""
-        assert "# Invoker: v" in ResourceManager.GENERATED_MESSAGE, \
-            "Should contain version header"
-        
-        current_version = metadata.version('invoker')
-        assert f"v{current_version}" in ResourceManager.GENERATED_MESSAGE, \
-            "Should contain current invoker version"
-    
-    def test_generated_message_has_warning(self):
-        """Test that GENERATED_MESSAGE contains edit warning."""
-        assert "DO NOT MANUALLY EDIT THIS FILE" in ResourceManager.GENERATED_MESSAGE, \
-            "Should contain edit warning"
-    
-    def test_generated_message_has_rebuild_instruction(self):
-        """Test that GENERATED_MESSAGE contains rebuild instruction."""
-        assert "invoker rebuild" in ResourceManager.GENERATED_MESSAGE, \
-            "Should contain rebuild instruction"
-    
-    def test_generated_message_is_comment_block(self):
-        """Test that GENERATED_MESSAGE is properly formatted as comments."""
-        lines = ResourceManager.GENERATED_MESSAGE.split('\n')
-        
-        for line in lines:
-            if line.strip():  # Skip empty lines
-                assert line.startswith("#"), \
-                    "All non-empty lines should be comments"
+class TestInvokerHeaderOps:
+    """Test suite for header build/parse/strip operations."""
+
+    def test_build_invoker_header_contains_core_fields(self, tmp_path):
+        header_lines = ResourceManager.build_invoker_header("script.py")
+        header_text = "".join(header_lines)
+        assert "# Invoker: v" in header_text, "Header should contain version line"
+        assert "# DO NOT MANUALLY EDIT THIS FILE." in header_text, "Header should contain warning"
+        assert "# Invoker resource: script.py" in header_text, "Header should contain resource path"
+        assert "# Date: " in header_text, "Header should contain date line"
+        assert "# Hash:" in header_text, "Header should contain hash line"
+
+    def test_parse_invoker_header_extracts_fields(self, tmp_path):
+        # Build header for existing resource and write to a temp file with a body
+        header_text = "".join(ResourceManager.build_invoker_header("script.py"))
+        body = "print('body')\n"
+        temp_file = tmp_path / "with_header.py"
+        temp_file.write_text(header_text + body, encoding="utf-8")
+
+        num_lines, fields = ResourceManager.parse_invoker_header(temp_file)
+        assert num_lines > 0, "Header line count should be positive when header present"
+        assert fields.get("version") == metadata.version('invoker'), "Version should match package version"
+        assert fields.get("resource") == "script.py", "Resource should be extracted from header"
+        assert fields.get("date"), "Date should be present"
+        assert fields.get("hash") and len(fields["hash"]) == 32, "Hash should be present and 32 hex chars"
+
+    def test_strip_invoker_header_removes_header(self, tmp_path):
+        header_text = "".join(ResourceManager.build_invoker_header("script.py"))
+        body_lines = ["x = 1\n", "print(x)\n"]
+        temp_file = tmp_path / "to_strip.py"
+        temp_file.write_text(header_text + "".join(body_lines), encoding="utf-8")
+
+        stripped = ResourceManager.strip_invoker_header(temp_file)
+        assert stripped == body_lines, "strip_invoker_header should return only body lines"
+
+    def test_strip_invoker_header_no_header_returns_same(self, tmp_path):
+        body_lines = ["a = 10\n", "b = a + 1\n", "print(b)\n"]
+        temp_file = tmp_path / "no_header.py"
+        temp_file.write_text("".join(body_lines), encoding="utf-8")
+
+        stripped = ResourceManager.strip_invoker_header(temp_file)
+        assert stripped == body_lines, "Files without header should be returned unchanged"
+
+    def test_strip_invoker_header_skips_trailing_blank_lines(self, tmp_path):
+        header_text = "".join(ResourceManager.build_invoker_header("script.py"))
+        # Add several blank lines after the header before the body
+        blanks = ["\n", "\n", "\n"]
+        body_lines = ["val = 99\n", "print(val)\n"]
+        temp_file = tmp_path / "with_blanks.py"
+        temp_file.write_text(header_text + "".join(blanks) + "".join(body_lines), encoding="utf-8")
+
+        stripped = ResourceManager.strip_invoker_header(temp_file)
+        assert stripped == body_lines, "Trailing blank lines after header should be skipped"
+
+
+class TestResolveResourcePath:
+    """Test suite for resource path resolution."""
+
+    def test_resolve_valid_top_level_resource(self):
+        p = ResourceManager._resolve_resource_path("invoker.py")
+        assert p.name == "invoker.py"
+        assert p.exists(), "Resolved top-level resource should exist"
+
+    def test_resolve_valid_subpath_resource(self):
+        p = ResourceManager._resolve_resource_path("util/image.py")
+        assert p.name == "image.py"
+        assert p.parent.name == "util"
+        assert p.exists(), "Resolved subpath resource should exist"
+
+    def test_resolve_absolute_path_raises(self):
+        abs_path = os.path.abspath(__file__)
+        import pytest
+        with pytest.raises(SystemExit) as exc_info:
+            ResourceManager._resolve_resource_path(abs_path)
+        assert exc_info.value.code == 1
+
+    def test_resolve_traversal_outside_raises(self):
+        import pytest
+        with pytest.raises(SystemExit) as exc_info:
+            ResourceManager._resolve_resource_path("../outside.py")
+        assert exc_info.value.code == 1
 

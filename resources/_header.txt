@@ -1,0 +1,10 @@
+# Invoker: v{version}
+# DO NOT MANUALLY EDIT THIS FILE.
+#
+# This script was generated with invoker.
+# To regenerate file, run `invoker rebuild`.
+# Invoker resource: {resource}
+# Date: {date}
+# Hash:	{hash}
+
+
