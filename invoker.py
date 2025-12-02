@@ -49,6 +49,17 @@ def import_cmd(resource_path, dest_path):
     click.secho("Success!", fg="green")
 
 
+@cli.command(name="export")
+@click.argument("resource_path")
+@click.option("--dest", "dest_path", default=None, help="Optional destination relative resource path")
+def export_cmd(resource_path, dest_path):
+    click.secho(f"Exporting {resource_path}...", fg="yellow")
+    project = Project(Path())
+    project.load()
+    project.export_resource(resource_path, dest_rel_path=dest_path)
+    click.secho("Success!", fg="green")
+
+
 @create.command()
 @click.argument("module_name")
 def module(module_name):

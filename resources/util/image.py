@@ -38,7 +38,7 @@ class Image:
                 raise ValueError("Unsupported image dtype: %s" % self.image.dtype)
         else:
             self.eotf = eotf
-    
+
     @classmethod
     def read(self, path, eotf=None):
         arr = iio.imread(path)
@@ -49,13 +49,13 @@ class Image:
         else:
             raise ValueError("Unsupported image dtype: %s" % self.image.dtype)
         return Image(arr, dim_labels="HWC", eotf=eotf, label=path)
-    
+
     def get(self, eotf='linear', dim_labels='BHWC', dtype=np.float32, device='cpu'):
         output = convert_eotf(self.image, self.eotf, eotf)
         output = transpose_image(output, self.dim_labels, dim_labels)
         output = convert_dtype(output, dtype, device=device)
         return output
-    
+
     def write(self, path, eotf='sRGB', format='png'):
         image = self.get(eotf=eotf, dim_labels="HWC", dtype=np.float32)
         image = np.nan_to_num(image, nan=0.0, posinf=1.0, neginf=0.0)
@@ -115,11 +115,11 @@ def transpose_image(image, input_dim_labels, output_dim_labels):
             # Insert a size-1 axis where needed (e.g., adding batch 'B')
             arr = expand_dims_fn(arr, axis=i)
             current_labels.insert(i, lbl)
-    
+
     for lbl in zip(current_labels, output_dim_labels):
         if lbl[0] != lbl[1]:
             raise ValueError("Dimension labels do not match: %s -> %s" % (lbl[0], lbl[1]))
-    
+
     return arr
 
 
@@ -170,5 +170,3 @@ def convert_dtype(image, dtype=np.float32, device='cpu'):
         raise ValueError("Unsupported dtype conversion (torch input): %s" % dtype)
 
     raise ValueError("Unsupported input type for convert_dtype: %s" % type(image))
-
-

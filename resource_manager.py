@@ -3,7 +3,7 @@ from importlib import metadata
 from pathlib import Path
 import hashlib
 import os
-from util import raise_error
+from util import raise_error, warn
 
 
 class ResourceManager:
@@ -11,15 +11,6 @@ class ResourceManager:
     Handles resource hashing, file header signing, path resolution under the
     package `resources/` directory, and copying resources into a target project.
     """
-
-    # Header injected when signing generated files
-    GENERATED_MESSAGE = f"""\
-# Invoker: v{metadata.version('invoker')}
-# DO NOT MANUALLY EDIT THIS FILE.
-#
-# This script was generated with invoker.
-# To regenerate file, run `invoker rebuild`.
-"""
 
     @staticmethod
     def _compute_hash(raw_bytes: bytes) -> str:
@@ -45,6 +36,58 @@ class ResourceManager:
         except ValueError:
             raise_error("Resource path must be within the resources directory.")
         return candidate
+
+    # Header injected when signing generated files
+    GENERATED_MESSAGE = f"""\
+# Invoker: v{metadata.version('invoker')}
+# DO NOT MANUALLY EDIT THIS FILE.
+#
+# This script was generated with invoker.
+# To regenerate file, run `invoker rebuild`.
+"""
+
+    @classmethod
+    def add_invoker_header(cls, src_rel_path: str):
+        """
+        Build the invoker header lines for a given resource path.
+        Computes the resource file hash internally.
+        Returns a list of strings (each ending with newline) for callers to write.
+        """
+        resource_path = cls._resolve_resource_path(src_rel_path)
+        with resource_path.open("rb") as f:
+            file_hash = cls._compute_hash(f.read())
+        header_lines = []
+        header_lines.append(cls.GENERATED_MESSAGE)
+        header_lines.append(f"# Invoker resource: {src_rel_path}\n")
+        header_lines.append(f"# Date: {date.today().strftime('%Y-%m-%d')}\n")
+        header_lines.append(f"# Hash:\t{file_hash}\n")
+        return header_lines
+
+    @classmethod
+    def strip_invoker_header(cls, lines):
+        """
+        Remove invoker-generated header (including hash line and trailing blanks)
+        from the top of a file, if present. Returns a new list of lines.
+        """
+        if not lines:
+            return lines
+        if not lines[0].startswith("# Invoker: v"):
+            return lines
+        end_idx = None
+        for i, line in enumerate(lines[:50]):
+            if line.startswith("# Hash:"):
+                end_idx = i + 1
+                break
+        if end_idx is None:
+            for i, line in enumerate(lines):
+                if not line.startswith("#") and len(line.strip()) > 0:
+                    end_idx = i
+                    break
+        if end_idx is None:
+            return lines
+        while end_idx < len(lines) and lines[end_idx].strip() == "":
+            end_idx += 1
+        return lines[end_idx:]
 
     @classmethod
     def compute_resource_hash(cls, resource_rel_path: str) -> str:
@@ -87,7 +130,7 @@ class ResourceManager:
             return None
 
     @classmethod
-    def copy_resource(
+    def import_resource(
         cls,
         src_rel_path: str,
         dst_path: Path,
@@ -95,15 +138,27 @@ class ResourceManager:
         preprocess_fn=lambda l: l,
     ):
         resource_path = cls._resolve_resource_path(src_rel_path)
-        with resource_path.open("rb") as f:
-            file_hash = cls._compute_hash(f.read())
         with resource_path.open("r", encoding="utf-8") as inf, open(dst_path, "w") as outf:
             if sign:
-                outf.write(cls.GENERATED_MESSAGE)
-                outf.write(f"# Invoker resource: {src_rel_path}\n")
-                outf.write(f"# Date: {date.today().strftime('%Y-%m-%d')}\n")
-                outf.write(f"# Hash:\t{file_hash}\n")
+                header_lines = cls.add_invoker_header(src_rel_path)
+                outf.writelines(header_lines)
             for line in inf:
                 outf.write(preprocess_fn(line))
+
+    @classmethod
+    def export_resource(cls, src_path: Path, dest_rel_path: str):
+        """
+        Copy a project-local file into the package resources directory,
+        stripping any invoker-generated header if present.
+        """
+        dest = cls._get_resources_path() / dest_rel_path
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if dest.exists():
+            warn(f"Overwriting existing resource at {dest}")
+
+        with open(src_path, "r", encoding="utf-8") as inf, open(dest, "w", encoding="utf-8") as outf:
+            lines = inf.readlines()
+            cleaned = cls.strip_invoker_header(lines)
+            outf.writelines(cleaned)
 
 

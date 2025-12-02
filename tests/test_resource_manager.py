@@ -165,7 +165,7 @@ class TestCopyResource:
     def test_copy_resource_basic(self, temp_project_dir):
         """Test basic resource copying without signing."""
         dest_file = temp_project_dir / "copied_script.py"
-        ResourceManager.copy_resource("script.py", dest_file, sign=False)
+        ResourceManager.import_resource("script.py", dest_file, sign=False)
         
         assert dest_file.exists(), "Destination file should be created"
         
@@ -180,7 +180,7 @@ class TestCopyResource:
     def test_copy_resource_with_signing(self, temp_project_dir):
         """Test resource copying with signing."""
         dest_file = temp_project_dir / "signed_file.py"
-        ResourceManager.copy_resource("invoker.py", dest_file, sign=True)
+        ResourceManager.import_resource("invoker.py", dest_file, sign=True)
         
         assert dest_file.exists(), "Destination file should be created"
         
@@ -203,7 +203,7 @@ class TestCopyResource:
         """Header should include exact resource path and today's date."""
         resource_rel_path = "util/image.py"
         dest_file = temp_project_dir / "signed_image_util.py"
-        ResourceManager.copy_resource(resource_rel_path, dest_file, sign=True)
+        ResourceManager.import_resource(resource_rel_path, dest_file, sign=True)
 
         with open(dest_file, "r") as f:
             lines = f.readlines()
@@ -227,7 +227,7 @@ class TestCopyResource:
     def test_copy_resource_signed_hash_integrity(self, temp_project_dir):
         """Test that signed resource has correct hash."""
         dest_file = temp_project_dir / "hashed_file.py"
-        ResourceManager.copy_resource("module_base.py", dest_file, sign=True)
+        ResourceManager.import_resource("module_base.py", dest_file, sign=True)
         
         # Compute resource hash
         resource_hash = ResourceManager.compute_resource_hash("module_base.py")
@@ -248,7 +248,7 @@ class TestCopyResource:
         def replace_placeholder(line):
             return line.replace("__MODULE__", "TestModule")
         
-        ResourceManager.copy_resource(
+        ResourceManager.import_resource(
             "module_base.py",
             dest_file,
             sign=False,
@@ -267,7 +267,7 @@ class TestCopyResource:
     def test_copy_resource_version_in_header(self, temp_project_dir):
         """Test that signed resource has correct version in header."""
         dest_file = temp_project_dir / "versioned.py"
-        ResourceManager.copy_resource("invoker.py", dest_file, sign=True)
+        ResourceManager.import_resource("invoker.py", dest_file, sign=True)
         
         with open(dest_file, "r") as f:
             first_line = f.readline()
@@ -280,7 +280,7 @@ class TestCopyResource:
     def test_copy_resource_preserves_content(self, temp_project_dir):
         """Test that resource content is preserved during copy."""
         dest_file = temp_project_dir / "preserved.py"
-        ResourceManager.copy_resource("script.py", dest_file, sign=False)
+        ResourceManager.import_resource("script.py", dest_file, sign=False)
         
         # Read both source and destination using the helper
         resource_files = ResourceManager._get_resources_path()
@@ -299,7 +299,7 @@ class TestCopyResource:
         # which works reliably across all installation types
         dest_file = temp_project_dir / "file_based_test.py"
         
-        ResourceManager.copy_resource("script.py", dest_file, sign=True)
+        ResourceManager.import_resource("script.py", dest_file, sign=True)
         
         # Verify file was created
         assert dest_file.exists(), "File should be created using file-based path"

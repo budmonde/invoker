@@ -5,7 +5,7 @@ import click
 import subprocess
 
 from resource_manager import ResourceManager
-from util import to_camel_case, raise_error, warn
+from util import to_camel_case, raise_error, warn, is_editable_install
 
 class Project:
     def __init__(self, root_path):
@@ -16,7 +16,7 @@ class Project:
     def initialize(self):
         if self.invoker_path.exists():
             raise_error(f"invoker module already exists at {self.invoker_path}!")
-        ResourceManager.copy_resource("invoker.py", self.invoker_path, sign=True)
+        ResourceManager.import_resource("invoker.py", self.invoker_path, sign=True)
         self.project_version = metadata.version('invoker')
         self.validate()
         return self
@@ -76,7 +76,7 @@ class Project:
 
         # Add boilerplate module base class resource
         module_base_path = module_path / f"base_{module_name}.py"
-        ResourceManager.copy_resource(
+        ResourceManager.import_resource(
             "module_base.py",
             module_base_path,
             preprocess_fn=lambda l: l.replace("__MODULE__", to_camel_case(module_name)),
@@ -90,7 +90,7 @@ class Project:
         script_path = self.root_path / f"{script_name}.py"
         if script_path.exists():
             raise_error(f"script already exists at {script_path}!")
-        ResourceManager.copy_resource(
+        ResourceManager.import_resource(
             "script.py",
             script_path,
             preprocess_fn=lambda l: l.replace("__SCRIPT__", to_camel_case(script_name)),
@@ -124,7 +124,17 @@ class Project:
         target_rel_path = dest_rel_path if dest_rel_path is not None else resource_rel_path
         dest_path = self.root_path / target_rel_path
         dest_path.parent.mkdir(parents=True, exist_ok=True)
-        ResourceManager.copy_resource(resource_rel_path, dest_path, sign=True)
+        ResourceManager.import_resource(resource_rel_path, dest_path, sign=True)
+
+    def export_resource(self, resource_rel_path: str, dest_rel_path: str = None):
+        self.validate()
+        if not is_editable_install():
+            raise_error("Invoker must be installed in editable mode to export resources. Reinstall with 'pip install -e .'.")
+        src = self.root_path / resource_rel_path
+        if not src.exists():
+            raise_error(f"Source file does not exist: {src}")
+        dest_rel = dest_rel_path if dest_rel_path is not None else resource_rel_path
+        ResourceManager.export_resource(src, dest_rel)
 
     def rebuild(self):
         self.check_version(error_on_mismatch=True)
@@ -155,8 +165,8 @@ class Project:
         if cached_hash != computed_hash:
             backup_path = Path(str(path) + ".bak")
             path.rename(backup_path)
-            ResourceManager.copy_resource(resource_name, path, sign=sign)
+            ResourceManager.import_resource(resource_name, path, sign=sign)
             return
         if resource_hash != cached_hash:
-            ResourceManager.copy_resource(resource_name, path, sign=sign)
+            ResourceManager.import_resource(resource_name, path, sign=sign)
             return
