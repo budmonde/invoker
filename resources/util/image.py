@@ -1,13 +1,3 @@
-# Invoker: v0.3.2
-# DO NOT MANUALLY EDIT THIS FILE.
-#
-# This script was generated with invoker.
-# To regenerate file, run `invoker rebuild`.
-# Resource name: util/image.py
-# Date: 2025-12-02
-# Hash: cdd2643b6b800ad4dfa6bec51ad7c5e6
-
-
 import logging
 
 import imageio.v3 as iio
