@@ -191,12 +191,11 @@ class TestExport:
         # Exported file should be stripped (no header) and contain only modified body
         assert dest.read_text(encoding="utf-8") == body_modified
 
-    def test_cli_export_non_editable_install_raises(self, export_setup):
+    def test_cli_export_non_editable_install_raises(self, export_setup, capsys):
         project = export_setup["project"]
         sandbox = export_setup["sandbox"]
         root = export_setup["root"]
         monkeypatch = export_setup["monkeypatch"]
-        runner = export_setup["runner"]
 
         # Override editable check to simulate non-editable install
         monkeypatch.setattr("project.is_editable_install", lambda: False)
@@ -207,22 +206,23 @@ class TestExport:
         src_file.write_text("print('hello')\n", encoding="utf-8")
 
         monkeypatch.chdir(root)
-        result = runner.invoke(cli, ["export", rel_path])
-        assert result.exit_code != 0, "CLI export should fail for non-editable install"
-        assert "editable mode" in result.stderr or "editable mode" in result.output
+        with pytest.raises(SystemExit):
+            cli.main(args=["export", rel_path], prog_name="invoker", standalone_mode=False)
+        captured = capsys.readouterr()
+        assert "editable mode" in captured.err
 
-    def test_cli_export_missing_source_raises(self, export_setup):
+    def test_cli_export_missing_source_raises(self, export_setup, capsys):
         project = export_setup["project"]
         root = export_setup["root"]
         monkeypatch = export_setup["monkeypatch"]
-        runner = export_setup["runner"]
 
         rel_path = "util/does_not_exist.py"
         # Do not create the file
 
         monkeypatch.chdir(root)
-        result = runner.invoke(cli, ["export", rel_path])
-        assert result.exit_code != 0, "CLI export should fail when source file is missing"
-        assert "Source file does not exist" in (result.stderr or result.output)
+        with pytest.raises(SystemExit):
+            cli.main(args=["export", rel_path], prog_name="invoker", standalone_mode=False)
+        captured = capsys.readouterr()
+        assert "Source file does not exist" in captured.err
 
 
