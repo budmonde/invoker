@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from resources.util.image import transpose_image
+from util.image import transpose_image
 
 
 def make_np(shape):
@@ -171,5 +171,6 @@ def test_complex_torch():
     y = transpose_image(x, "BHWC", "CHW")
     assert tuple(y.shape) == (C, H, W)
     assert torch.equal(y, x[0].permute(2, 0, 1))
+
 
 

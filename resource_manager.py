@@ -30,6 +30,13 @@ class ResourceManager:
             candidate.relative_to(resources_root)
         except ValueError:
             raise_error("Resource path must be within the resources directory.")
+        # Disallow importing anything from resources/tests
+        tests_dir = (resources_root / "tests").resolve()
+        try:
+            candidate.relative_to(tests_dir)
+            raise_error("Resources under 'resources/tests' are not importable.")
+        except ValueError:
+            pass
         return candidate
 
     @staticmethod

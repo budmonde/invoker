@@ -93,4 +93,18 @@ class TestImportResources:
         result = runner.invoke(cli, ["import", "../invoker.py"])
         assert result.exit_code != 0, "CLI should fail for resource path outside resources"
 
+    def test_import_project_disallows_resources_tests(self, temp_project_dir):
+        project = Project(temp_project_dir)
+        project.initialize()
+        with pytest.raises(SystemExit):
+            project.import_resource("tests/test_image_convert_dtype.py")
+
+    def test_cli_import_disallows_resources_tests(self, temp_project_dir, monkeypatch):
+        project = Project(temp_project_dir)
+        project.initialize()
+        runner = CliRunner()
+        monkeypatch.chdir(temp_project_dir)
+        result = runner.invoke(cli, ["import", "tests/test_image_convert_dtype.py"])
+        assert result.exit_code != 0, "CLI should fail for resource path under resources/tests"
+
 

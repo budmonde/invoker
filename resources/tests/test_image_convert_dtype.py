@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from resources.util.image import convert_dtype
+from util.image import convert_dtype
 
 
 def make_np(shape, dtype=np.float32):
@@ -106,4 +106,5 @@ def test_invalid_dtype_raises_torch_input():
     x = make_torch((2, 3), dtype=torch.float32, device='cpu')
     with pytest.raises(ValueError):
         _ = convert_dtype(x, dtype="not_a_dtype")
+
 

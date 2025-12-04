@@ -1,6 +1,20 @@
+# Invoker: v0.3.2
+# DO NOT MANUALLY EDIT THIS FILE.
+#
+# This script was generated with invoker.
+# To regenerate file, run `invoker rebuild`.
+# Resource name: util/image.py
+# Date: 2025-12-02
+# Hash: cdd2643b6b800ad4dfa6bec51ad7c5e6
+
+
+import logging
+
 import imageio.v3 as iio
 import numpy as np
 import torch
+
+from util.arraylib import arraylib
 
 
 INFERRED_EOTF_FROM_DTYPE = {
@@ -8,61 +22,106 @@ INFERRED_EOTF_FROM_DTYPE = {
     np.float32: 'linear',
 }
 
-EOTF_TABLE = {
-    ('sRGB', 'linear'): lambda x: x ** 2.2,
-    ('linear', 'sRGB'): lambda x: x ** (1.0 / 2.2),
-}
-
-def convert_eotf(image, input_eotf, output_eotf):
-    if input_eotf == output_eotf:
-        return image
-    if (input_eotf, output_eotf) not in EOTF_TABLE:
-        raise ValueError("Unsupported EOTF conversion: %s -> %s" % (input_eotf, output_eotf))
-    return EOTF_TABLE[(input_eotf, output_eotf)](image)
 
 class Image:
-    def __init__(self, image, eotf, dim_labels, label=None):
-        self.image = image
-        self.eotf = eotf
-        self.dim_labels = dim_labels
-        self.label = label
-
-        if len(image.shape) != len(dim_labels):
-            raise ValueError("Image shape %s does not match dim labels %s" % (image.shape, dim_labels))
-
     @classmethod
-    def read(self, path, eotf=None):
+    def read(self, path, encoding=None, colorspace='sRGB'):
         arr = iio.imread(path)
         dtype = arr.dtype.type
 
-        if eotf is None:
-            if dtype in INFERRED_EOTF_FROM_DTYPE:
-                eotf = INFERRED_EOTF_FROM_DTYPE[dtype]
-            else:
-                raise ValueError("Cannot infer EOTF from dtype: %s. Specify EOTF explicitly." % dtype)
+        if colorspace == 'sRGB' and encoding is None:
+            logging.info("Inferring encoding from dtype: %s", dtype)
+            encoding = INFERRED_EOTF_FROM_DTYPE[dtype]
+        elif colorspace != 'sRGB' and encoding is None:
+            logging.info("Importing Colorspace module for non-sRGB (%s) colorspace", colorspace)
+            from util.colorspace import Colorspaces
+            encoding = Colorspaces.get_eotf(colorspace)
 
         if dtype == np.uint8:
             arr = arr.astype(np.float32) / 255.0
         elif dtype == np.float32:
             pass
         else:
-            raise ValueError("Unsupported image dtype: %s" % dtype)
+            raise ValueError("Unsupported image dtype: %s", dtype)
 
-        return Image(arr, eotf=eotf, dim_labels="HWC", label=path)
+        return Image(arr, encoding=encoding, colorspace=colorspace, dim_labels="HWC", label=path)
 
-    def get(self, eotf='linear', dim_labels='BHWC', dtype=np.float32, device='cpu'):
-        output = convert_eotf(self.image, self.eotf, eotf)
+    def __init__(self, image, encoding, colorspace, dim_labels, label=None):
+        self.image = image
+        self.encoding = encoding
+        self.colorspace = colorspace
+        self.dim_labels = dim_labels
+        self.label = label
+
+        if len(image.shape) != len(dim_labels):
+            raise ValueError("Image shape %s does not match dim labels %s", image.shape, dim_labels)
+    
+    def get(self, encoding='linear', colorspace='sRGB', dim_labels='BHWC', dtype=np.float32, device='cpu'):
+        output = self.image
+        if self.colorspace == 'sRGB' and colorspace == 'sRGB':
+            output = EOTF.convert(output, self.encoding, encoding)
+        else:
+            logging.info("Importing ColorspaceLibrary for non-sRGB (%s) colorspace", colorspace)
+            from util.colorspace import ColorspaceLibrary
+            output = EOTF.convert(output, self.encoding, "linear")
+            output = ColorspaceLibrary.convert(output, self.colorspace, colorspace, dim_labels=self.dim_labels)
+            output = EOTF.convert(output, "linear", encoding)
+
         output = transpose_image(output, self.dim_labels, dim_labels)
         output = convert_dtype(output, dtype, device=device)
         return output
 
-    def write(self, path, eotf='sRGB', format='png'):
-        image = self.get(eotf=eotf, dim_labels="HWC", dtype=np.float32)
-        image = np.nan_to_num(image, nan=0.0, posinf=1.0, neginf=0.0)
-        if image.shape[-1] == 1:
-            image = np.repeat(image, 3, axis=-1)
-        image_u8 = (np.clip(image, 0, 1) * 255.0).astype(np.uint8)
-        iio.imwrite(path, image_u8)
+    def write(self, path, encoding='sRGB', colorspace='sRGB', fmt='png'):
+        image = self.get(encoding=encoding, colorspace=colorspace, dim_labels="HWC", dtype=np.float32)
+        if fmt == 'png':
+            image = np.nan_to_num(image, nan=0.0, posinf=1.0, neginf=0.0)
+            if image.shape[-1] == 1:
+                image = np.repeat(image, 3, axis=-1)
+            image_u8 = (np.clip(image, 0, 1) * 255.0).astype(np.uint8)
+            iio.imwrite(path, image_u8)
+        else:
+            raise ValueError("Unsupported format: %s", fmt)
+
+
+class EOTF:
+    eotfs = {
+        ('linear', 'linear'): lambda x: x,
+        ('sRGB', 'linear'): lambda x: arraylib.where(x > 0.04045, ((x + 0.055) / 1.055)**2.4, x / 12.92),
+        ('linear', 'sRGB'): lambda x: arraylib.where(x > 0.0031308, 1.055 * x**(1.0 / 2.4) - 0.055, 12.92 * x),
+    }
+    
+    @classmethod
+    def convert(cls, image, input_encoding, output_encoding):
+        logging.debug("Converting encoding from %s to %s", input_encoding, output_encoding)
+        if input_encoding == output_encoding:
+            return image
+
+        arraylib.use_like(image)
+        cls._ensure_gamma_coders(input_encoding)
+        cls._ensure_gamma_coders(output_encoding)
+
+        to_linear_fn = cls.eotfs.get((input_encoding, 'linear'))
+        if to_linear_fn is None:
+            raise ValueError("Unsupported EOTF: %s -> linear", input_encoding)
+        image_linear = to_linear_fn(image)
+
+        from_linear_fn = cls.eotfs.get(('linear', output_encoding))
+        if from_linear_fn is None:
+            raise ValueError("Unsupported EOTF: linear -> %s", output_encoding)
+        output = from_linear_fn(image_linear)
+        return output
+
+    @classmethod
+    def _ensure_gamma_coders(cls, node):
+        if not isinstance(node, (int, float)):
+            return
+        gamma = float(node)
+        if (gamma, 'linear') in cls.eotfs:
+            return
+        cls.eotfs[(gamma, 'linear')] = lambda x: x ** gamma
+        if ('linear', gamma) in cls.eotfs:
+            return
+        cls.eotfs[('linear', gamma)] = lambda x: x ** (1.0 / gamma)
 
 
 def transpose_image(image, input_dim_labels, output_dim_labels):
@@ -97,8 +156,8 @@ def transpose_image(image, input_dim_labels, output_dim_labels):
         src_idx = current_labels.index(lbl)
         if arr.shape[src_idx] != 1:
             raise ValueError(
-                "Cannot drop non-unit axis '%s' of size %d when converting %s -> %s"
-                % (lbl, arr.shape[src_idx], "".join(input_dim_labels), "".join(output_dim_labels))
+                "Cannot drop non-unit axis '%s' of size %d when converting %s -> %s",
+                lbl, arr.shape[src_idx], "".join(input_dim_labels), "".join(output_dim_labels)
             )
         arr = squeeze_axis_fn(arr, src_idx)
         del current_labels[src_idx]
@@ -118,7 +177,7 @@ def transpose_image(image, input_dim_labels, output_dim_labels):
 
     for lbl in zip(current_labels, output_dim_labels):
         if lbl[0] != lbl[1]:
-            raise ValueError("Dimension labels do not match: %s -> %s" % (lbl[0], lbl[1]))
+            raise ValueError("Dimension labels do not match: %s -> %s", lbl[0], lbl[1])
 
     return arr
 
@@ -154,7 +213,7 @@ def convert_dtype(image, dtype=np.float32, device='cpu'):
         np_dtype = as_numpy_dtype(dtype)
         if np_dtype is not None:
             return image.astype(np_dtype, copy=False)
-        raise ValueError("Unsupported dtype conversion (numpy input): %s" % dtype)
+        raise ValueError("Unsupported dtype conversion (numpy input): %s", dtype)
 
     if torch.is_tensor(image):
         if is_torch_dtype(dtype):
@@ -167,6 +226,6 @@ def convert_dtype(image, dtype=np.float32, device='cpu'):
             if interm_torch_dtype is not None:
                 tensor_cpu = tensor_cpu.to(dtype=interm_torch_dtype)
             return tensor_cpu.contiguous().numpy().astype(np_dtype, copy=False)
-        raise ValueError("Unsupported dtype conversion (torch input): %s" % dtype)
+        raise ValueError("Unsupported dtype conversion (torch input): %s", dtype)
 
-    raise ValueError("Unsupported input type for convert_dtype: %s" % type(image))
+    raise ValueError("Unsupported input type for convert_dtype: %s", type(image))
