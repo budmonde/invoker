@@ -14,9 +14,6 @@ import imageio.v3 as iio
 import numpy as np
 import torch
 
-from util.arraylib import arraylib
-
-
 INFERRED_EOTF_FROM_DTYPE = {
     np.uint8: 'sRGB',
     np.float32: 'linear',
@@ -86,8 +83,8 @@ class Image:
 class EOTF:
     eotfs = {
         ('linear', 'linear'): lambda x: x,
-        ('sRGB', 'linear'): lambda x: arraylib.where(x > 0.04045, ((x + 0.055) / 1.055)**2.4, x / 12.92),
-        ('linear', 'sRGB'): lambda x: arraylib.where(x > 0.0031308, 1.055 * x**(1.0 / 2.4) - 0.055, 12.92 * x),
+        ('sRGB', 'linear'): lambda x: (x > 0.04045) * ((x + 0.055) / 1.055)**2.4 + (x <= 0.04045) * (x / 12.92),
+        ('linear', 'sRGB'): lambda x: (x > 0.0031308) * (1.055 * x**(1.0 / 2.4) - 0.055) + (x <= 0.0031308) * (12.92 * x),
     }
     
     @classmethod
@@ -96,7 +93,6 @@ class EOTF:
         if input_encoding == output_encoding:
             return image
 
-        arraylib.use_like(image)
         cls._ensure_gamma_coders(input_encoding)
         cls._ensure_gamma_coders(output_encoding)
 
@@ -116,12 +112,10 @@ class EOTF:
         if not isinstance(node, (int, float)):
             return
         gamma = float(node)
-        if (gamma, 'linear') in cls.eotfs:
-            return
-        cls.eotfs[(gamma, 'linear')] = lambda x: x ** gamma
-        if ('linear', gamma) in cls.eotfs:
-            return
-        cls.eotfs[('linear', gamma)] = lambda x: x ** (1.0 / gamma)
+        if (gamma, 'linear') not in cls.eotfs:
+            cls.eotfs[(gamma, 'linear')] = lambda x: x ** gamma
+        if ('linear', gamma) not in cls.eotfs:
+            cls.eotfs[('linear', gamma)] = lambda x: x ** (1.0 / gamma)
 
 
 def transpose_image(image, input_dim_labels, output_dim_labels):
