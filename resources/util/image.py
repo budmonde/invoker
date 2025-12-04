@@ -169,10 +169,6 @@ def transpose_image(image, input_dim_labels, output_dim_labels):
             arr = expand_dims_fn(arr, axis=i)
             current_labels.insert(i, lbl)
 
-    for lbl in zip(current_labels, output_dim_labels):
-        if lbl[0] != lbl[1]:
-            raise ValueError("Dimension labels do not match: %s -> %s", lbl[0], lbl[1])
-
     return arr
 
 
