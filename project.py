@@ -124,6 +124,12 @@ class Project:
         target_rel_path = dest_rel_path if dest_rel_path is not None else resource_rel_path
         dest_path = self.root_path / target_rel_path
         dest_path.parent.mkdir(parents=True, exist_ok=True)
+        if dest_path.exists():
+            backup_path = Path(str(dest_path) + ".bak")
+            warn(f"Overwriting existing file at {dest_path}. Backing up to {backup_path}")
+            if backup_path.exists():
+                raise_error(f"Backup file already exists: {backup_path}. Aborting import.")
+            dest_path.rename(backup_path)
         ResourceManager.import_resource(resource_rel_path, dest_path, sign=True)
 
     def export_resource(self, resource_rel_path: str, dest_rel_path: str = None):
