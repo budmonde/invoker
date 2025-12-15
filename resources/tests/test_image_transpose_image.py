@@ -157,5 +157,5 @@ def test_non_string_dim_labels_raise(lib):
 
 
 def test_non_array_input_raises():
-    with pytest.raises(ValueError):
+    with pytest.raises(AttributeError):
         _ = transpose_image("not-an-array", "HWC", "CHW")

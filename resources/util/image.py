@@ -4,25 +4,14 @@ import imageio.v3 as iio
 import numpy as np
 import torch
 
-INFERRED_EOTF_FROM_DTYPE = {
-    np.uint8: 'sRGB',
-    np.float32: 'linear',
-}
-
-
 class Image:
     @classmethod
     def read(self, path, encoding=None, colorspace='sRGB'):
         arr = iio.imread(path)
         dtype = arr.dtype.type
 
-        if colorspace == 'sRGB' and encoding is None:
-            logging.info("Inferring encoding from dtype: %s", dtype)
-            encoding = INFERRED_EOTF_FROM_DTYPE[dtype]
-        elif colorspace != 'sRGB' and encoding is None:
-            logging.info("Importing Colorspace module for non-sRGB (%s) colorspace", colorspace)
-            from util.colorspace import Colorspaces
-            encoding = Colorspaces.get_eotf(colorspace)
+        if encoding is None:
+            encoding = self.infer_encoding(dtype, colorspace)
 
         if dtype == np.uint8:
             arr = arr.astype(np.float32) / 255.0
@@ -31,24 +20,49 @@ class Image:
         else:
             raise ValueError("Unsupported image dtype: %s", dtype)
 
-        return Image(arr, encoding=encoding, colorspace=colorspace, dim_labels="HWC", label=path)
+        return Image(arr, dim_labels="HWC", encoding=encoding, colorspace=colorspace, label=path)
 
-    def __init__(self, image, encoding, colorspace, dim_labels, label=None):
+    @classmethod
+    def infer_encoding(cls, dtype, colorspace):
+        INFERRED_ENCODING_FROM_DTYPE = {
+            np.uint8: 'sRGB',
+            np.float32: 'linear',
+        }
+        if colorspace == 'sRGB':
+            encoding = INFERRED_ENCODING_FROM_DTYPE[dtype]
+            logging.info("Inferring encoding from dtype %s as %s", dtype, encoding)
+        else:
+            logging.info("Importing Colorspace module for non-sRGB (%s) colorspace", colorspace)
+            from util.colorspace import Colorspaces
+            encoding = Colorspaces.get_eotf(colorspace)
+            logging.info("Inferring encoding from colorspace %s as %s", colorspace, encoding)
+        return encoding
+
+    def __init__(self, image, dim_labels, encoding="linear", colorspace=None, label=None):
+        if image is None:
+            raise ValueError("Image array must be provided")
+        if dim_labels is None:
+            raise ValueError("Explicit dim_labels must be provided")
+        dim_labels = validate_dim_labels(dim_labels, image.shape)
+
+        if colorspace is not None:
+            channel_dim = list(dim_labels).index("C")
+            num_channels = image.shape[channel_dim]
+            if colorspace is not None and num_channels != 3:
+                raise ValueError("Image in %s colorspace has %d channels, expected 3", colorspace, num_channels)
+
         self.image = image
         self.encoding = encoding
         self.colorspace = colorspace
         self.dim_labels = dim_labels
         self.label = label
 
-        if len(image.shape) != len(dim_labels):
-            raise ValueError("Image shape %s does not match dim labels %s", image.shape, dim_labels)
-    
-    def get(self, encoding='linear', colorspace='sRGB', dim_labels='BHWC', dtype=np.float32, device='cpu'):
+    def get(self, dim_labels='BHWC', encoding='linear', colorspace=None, dtype=np.float32, device='cpu'):
         output = self.image
-        if self.colorspace == 'sRGB' and colorspace == 'sRGB':
+        if self.colorspace is None or colorspace is None or self.colorspace == colorspace:
             output = EOTF.convert(output, self.encoding, encoding)
         else:
-            logging.info("Importing ColorspaceLibrary for non-sRGB (%s) colorspace", colorspace)
+            logging.info("Importing ColorspaceLibrary for (%s -> %s) colorspace conversion", self.colorspace, colorspace)
             from util.colorspace import ColorspaceLibrary
             output = EOTF.convert(output, self.encoding, "linear")
             output = ColorspaceLibrary.convert(output, self.colorspace, colorspace, dim_labels=self.dim_labels)
@@ -108,17 +122,24 @@ class EOTF:
             cls.eotfs[('linear', gamma)] = lambda x: x ** (1.0 / gamma)
 
 
-def transpose_image(image, input_dim_labels, output_dim_labels):
-    if not isinstance(input_dim_labels, str) or not isinstance(output_dim_labels, str):
-        raise ValueError("Input and output dim labels must be strings")
+def validate_dim_labels(dim_labels, shape=None):
+    if not isinstance(dim_labels, str):
+        raise ValueError("Dim labels must be a string, got %s", type(dim_labels))
+    if shape is not None and len(shape) != len(dim_labels):
+        raise ValueError("Shape %s does not match dim labels %s", shape, dim_labels)
 
     valid_labels = set("BFHWC")
-    if (set(input_dim_labels) - valid_labels) or (set(output_dim_labels) - valid_labels):
+    if (set(dim_labels) - valid_labels):
         raise ValueError("Unsupported dim labels. Only characters in 'BFHWC' are allowed.")
-    if len(set(input_dim_labels)) != len(input_dim_labels):
-        raise ValueError("Duplicate labels in input_dim_labels are not allowed.")
-    if len(set(output_dim_labels)) != len(output_dim_labels):
-        raise ValueError("Duplicate labels in output_dim_labels are not allowed.")
+    if len(set(dim_labels)) != len(dim_labels):
+        raise ValueError("Duplicate labels in dim_labels are not allowed.")
+
+    return dim_labels
+
+
+def transpose_image(image, input_dim_labels, output_dim_labels):
+    input_dim_labels = validate_dim_labels(input_dim_labels, image.shape)
+    output_dim_labels = validate_dim_labels(output_dim_labels)
     if input_dim_labels == output_dim_labels:
         return image
 
