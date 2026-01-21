@@ -171,7 +171,7 @@ class CIELABColorspace(Colorspace):
         l, a, b = arraylib.split(img_lab, Colorspace.NUM_CHANNELS, channel_dim)
         xn, yn, zn = NAMED_XYZ_COORDINATES[whitepoint]
 
-        finv = lambda f: arraylib.where(f > 0.206893, f ** 3.0, 7.787 * (f - 16.0 / 116.0))
+        finv = lambda f: arraylib.where(f > 0.206893, f ** 3.0, (f - 16.0 / 116.0) / 7.787)
         fy = (l + 16.0) / 116.0
         x = xn * finv(fy + a / 500.0)
         y = yn * finv(fy)
