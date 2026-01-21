@@ -33,3 +33,7 @@ py-modules = ["invoker", "project", "util", "resource_manager"]
 
 [tool.setuptools.packages.find]
 include = ["resources*"]
+
+[tool.setuptools.package-data]
+# Include non-.py resource files needed at runtime (e.g. invoker header template).
+"resources" = ["_header.txt"]
