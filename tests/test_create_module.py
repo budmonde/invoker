@@ -44,8 +44,13 @@ class TestCreateModule:
         with open(init_file, "r") as f:
             content = f.read()
 
-        # Check that file is empty (just makes the directory a Python package)
-        assert len(content) == 0, "__init__.py should be empty"
+        # Check that file contains __invoker_files__ for module tracking
+        assert (
+            "__invoker_files__" in content
+        ), "__init__.py should contain __invoker_files__"
+        assert (
+            f"base_{module_name}.py" in content
+        ), "__init__.py should list the base module file"
 
     def test_create_module_creates_base_file(self, temp_project_dir):
         """Test that create module creates base_<module_name>.py file."""

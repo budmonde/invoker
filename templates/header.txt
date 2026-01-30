@@ -1,0 +1,7 @@
+# Invoker: v{version}
+# DO NOT MANUALLY EDIT THIS FILE.
+# Re-generate with 'invoker rebuild' (see https://github.com/budmonde/invoker).
+#
+# Resource name: {resource}
+# Date: {date}
+# Hash: {hash}

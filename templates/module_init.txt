@@ -1,0 +1,4 @@
+__invoker_files__ = [
+    "{base_filename}",
+    # List additional files to include when importing this module
+]

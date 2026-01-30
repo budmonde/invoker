@@ -223,7 +223,7 @@ class TestInvokerCLI:
             assert (
                 result.exit_code == 0
             ), f"Rebuild should succeed. Output: {result.output}"
-            assert "Rebuildng project" in result.output
+            assert "Rebuilding project" in result.output
             assert "Success!" in result.output
 
     def test_rebuild_command_without_init(self, runner, temp_project_dir):

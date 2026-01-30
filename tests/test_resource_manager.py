@@ -105,7 +105,7 @@ class TestComputeResourceHash:
         assert len(result) == 32, "MD5 hash should be 32 characters"
 
         # Verify the path resolution works by checking _get_resources_path
-        resources_path = ResourceManager._get_resources_path()
+        resources_path = ResourceManager._get_resources_path("invoker")
         assert (
             resources_path / "invoker.py"
         ).exists(), "Resource file should be accessible via file-based path"
@@ -326,7 +326,7 @@ class TestCopyResource:
         ResourceManager.import_resource("script.py", dest_file, sign=False)
 
         # Read both source and destination using the helper
-        resource_files = ResourceManager._get_resources_path()
+        resource_files = ResourceManager._get_resources_path("invoker")
         with (resource_files / "script.py").open("r", encoding="utf-8") as f:
             original_content = f.read()
 
@@ -358,7 +358,7 @@ class TestCopyResource:
         assert "# Hash:" in content, "Should contain hash when signed"
 
         # Verify the resources path exists
-        resources_path = ResourceManager._get_resources_path()
+        resources_path = ResourceManager._get_resources_path("invoker")
         assert (
             resources_path / "script.py"
         ).exists(), "Resource file should be accessible"
@@ -441,12 +441,14 @@ class TestResolveResourcePath:
     """Test suite for resource path resolution."""
 
     def test_resolve_valid_top_level_resource(self):
-        p = ResourceManager._resolve_resource_path("invoker.py")
+        ns, p = ResourceManager._resolve_resource_path("invoker.py")
+        assert ns == "invoker"
         assert p.name == "invoker.py"
         assert p.exists(), "Resolved top-level resource should exist"
 
     def test_resolve_valid_subpath_resource(self):
-        p = ResourceManager._resolve_resource_path("util/image.py")
+        ns, p = ResourceManager._resolve_resource_path("util/image.py")
+        assert ns == "invoker"
         assert p.name == "image.py"
         assert p.parent.name == "util"
         assert p.exists(), "Resolved subpath resource should exist"
@@ -465,3 +467,37 @@ class TestResolveResourcePath:
         with pytest.raises(SystemExit) as exc_info:
             ResourceManager._resolve_resource_path("../outside.py")
         assert exc_info.value.code == 1
+
+    def test_resolve_namespaced_resource(self, monkeypatch, tmp_path):
+        """Test resolving a resource with namespace prefix."""
+        from pathlib import Path
+
+        # Create a mock plugin namespace
+        plugin_resources = tmp_path / "plugin_resources"
+        plugin_resources.mkdir()
+        (plugin_resources / "custom.py").write_text("# custom\n", encoding="utf-8")
+
+        # Get the real invoker resources path before mocking
+        real_invoker_resources = Path(__file__).resolve().parent.parent / "resources"
+
+        def mock_discover():
+            return {
+                "invoker": real_invoker_resources,
+                "testplugin": plugin_resources,
+            }
+
+        # Clear any cached sources first
+        ResourceManager._resource_sources = None
+        monkeypatch.setattr(
+            ResourceManager,
+            "_discover_resource_sources",
+            classmethod(lambda cls: mock_discover()),
+        )
+
+        ns, p = ResourceManager._resolve_resource_path("testplugin:custom.py")
+        assert ns == "testplugin"
+        assert p.name == "custom.py"
+        assert p.exists()
+
+        # Clean up
+        ResourceManager._resource_sources = None

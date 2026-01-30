@@ -33,11 +33,11 @@ invoker = "invoker:cli"
 py-modules = ["invoker", "project", "util", "resource_manager"]
 
 [tool.setuptools.packages.find]
-include = ["resources*"]
+include = ["resources*", "templates*"]
 
 [tool.setuptools.package-data]
-# Include non-.py resource files needed at runtime (e.g. invoker header template).
-"resources" = ["_header.txt"]
+# Include non-.py files needed at runtime
+"templates" = ["*.txt"]
 
 [tool.isort]
 profile = "black"
