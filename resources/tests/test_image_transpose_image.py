@@ -1,10 +1,9 @@
-import os, sys
-
 import numpy as np
 import pytest
 import torch
 
 from util.image import transpose_image
+
 from .helpers import make_array_from_shape
 
 
@@ -12,12 +11,15 @@ from .helpers import make_array_from_shape
 # Identity and basic reorders
 # ----------------------------
 @pytest.mark.parametrize("lib", ["numpy", "torch"])
-@pytest.mark.parametrize("labels,shape", [
-    ("HWC", (5, 7, 3)),
-    ("CHW", (3, 5, 7)),
-    ("BHWC", (1, 5, 7, 3)),
-    ("BCHW", (1, 3, 5, 7)),
-])
+@pytest.mark.parametrize(
+    "labels,shape",
+    [
+        ("HWC", (5, 7, 3)),
+        ("CHW", (3, 5, 7)),
+        ("BHWC", (1, 5, 7, 3)),
+        ("BCHW", (1, 3, 5, 7)),
+    ],
+)
 def test_identity(lib, labels, shape):
     dtype = np.float32 if lib == "numpy" else torch.float32
     x = make_array_from_shape(lib, shape, dtype=dtype)
@@ -31,10 +33,13 @@ def test_identity(lib, labels, shape):
 
 
 @pytest.mark.parametrize("lib", ["numpy", "torch"])
-@pytest.mark.parametrize("inp,out,shape,expected_perm", [
-    ("HWC", "CHW", (5, 7, 3), (2, 0, 1)),
-    ("BHWC", "BCHW", (1, 5, 7, 3), (0, 3, 1, 2)),
-])
+@pytest.mark.parametrize(
+    "inp,out,shape,expected_perm",
+    [
+        ("HWC", "CHW", (5, 7, 3), (2, 0, 1)),
+        ("BHWC", "BCHW", (1, 5, 7, 3), (0, 3, 1, 2)),
+    ],
+)
 def test_reorder(lib, inp, out, shape, expected_perm):
     dtype = np.float32 if lib == "numpy" else torch.float32
     x = make_array_from_shape(lib, shape, dtype=dtype)

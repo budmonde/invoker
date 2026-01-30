@@ -1,9 +1,9 @@
+import hashlib
+import re
 from datetime import date
 from importlib import metadata
 from pathlib import Path
-import hashlib
-import os
-import re
+
 from util import raise_error, warn
 
 
@@ -55,9 +55,9 @@ class ResourceManager:
             file_hash = cls._compute_hash(f.read())
         template = cls._get_header_template_path().read_text(encoding="utf-8")
         formatted = template.format(
-            version=metadata.version('invoker'),
+            version=metadata.version("invoker"),
             resource=src_rel_path,
-            date=date.today().strftime('%Y-%m-%d'),
+            date=date.today().strftime("%Y-%m-%d"),
             hash=file_hash,
         )
         return [formatted]
@@ -143,10 +143,12 @@ class ResourceManager:
         src_rel_path: str,
         dst_path: Path,
         sign: bool = False,
-        preprocess_fn=lambda l: l,
+        preprocess_fn=lambda line: line,
     ):
         resource_path = cls._resolve_resource_path(src_rel_path)
-        with resource_path.open("r", encoding="utf-8") as inf, open(dst_path, "w") as outf:
+        with resource_path.open("r", encoding="utf-8") as inf, open(
+            dst_path, "w"
+        ) as outf:
             if sign:
                 header_lines = cls.build_invoker_header(src_rel_path)
                 outf.writelines(header_lines)
@@ -196,5 +198,3 @@ class ResourceManager:
         text = src_path.read_text(encoding="utf-8")
         with open(dest, "w", encoding="utf-8") as outf:
             outf.write(text)
-
-

@@ -60,6 +60,7 @@ python invoker.py debug my_script.py:14
 
 Invoker projects can also be managed using a python CLI tool. For more information, see https://github.com/budmonde/invoker
 """
+
 import argparse
 import copy
 import cProfile as profile
@@ -78,38 +79,50 @@ from pathlib import Path
 
 class InvokerScript:
     """
-        @args_dict         : keyword argument overrides to default values of self.args()
-        @args_list         : argv list passed into argparse. args_dict takes priority
-        @run_as_root_script: run script as the entry point of the program
-        @log_to_console    : whether to emit logs to console or not
-        @logfile_root      : root path to logfiles
+    @args_dict         : keyword argument overrides to default values of self.args()
+    @args_list         : argv list passed into argparse. args_dict takes priority
+    @run_as_root_script: run script as the entry point of the program
+    @log_to_console    : whether to emit logs to console or not
+    @logfile_root      : root path to logfiles
     """
+
     def __init__(
-            self,
-            args_dict = None,
-            args_list = None,
-            run_as_root_script: bool = False,
-            log_to_console: bool = True,
-            logfile_root: str = None,
+        self,
+        args_dict=None,
+        args_list=None,
+        run_as_root_script: bool = False,
+        log_to_console: bool = True,
+        logfile_root: str = None,
     ):
         if run_as_root_script:
-            _initialize_logger(log_to_console, logfile_root, _to_underscore_case(type(self).__name__))
+            _initialize_logger(
+                log_to_console, logfile_root, _to_underscore_case(type(self).__name__)
+            )
 
         parser_manager = ParserManager()
         parser_manager.add_arguments(self.args())
         for attr_name, module_cls in self.modules().items():
-            parser_manager.add_arguments(module_cls.args(), key_prefix = attr_name)
-        script_config = self.build_config(parser_manager.parse_args(args_dict, args_list))
+            parser_manager.add_arguments(module_cls.args(), key_prefix=attr_name)
+        script_config = self.build_config(
+            parser_manager.parse_args(args_dict, args_list)
+        )
+
+        def is_valid_module_conf(key):
+            return len(key.split(".")) == 2
+
+        def module_conf_matches_module(key, attr_name):
+            return key.split(".")[0] == attr_name
+
+        def get_module_conf_key(key):
+            return key.split(".")[1]
 
         module_conf = {}
         for attr_name, module_cls in self.modules().items():
-            is_valid_module_conf = lambda key: len(key.split(".")) == 2
-            module_conf_matches_module = lambda key: key.split(".")[0] == attr_name
-            get_module_conf_key = lambda key: key.split(".")[1]
             module_args = {
-                get_module_conf_key(key) : value
+                get_module_conf_key(key): value
                 for key, value in script_config.items()
-                if is_valid_module_conf(key) and module_conf_matches_module(key)
+                if is_valid_module_conf(key)
+                and module_conf_matches_module(key, attr_name)
             }
 
             cls_inst = module_cls(module_args)
@@ -120,7 +133,11 @@ class InvokerScript:
         script_config.update(module_conf)
         self.opt = _deserialize_config(script_config)
 
-        logging.info("Initialized script %s with options:\n%s", type(self).__name__, pprint.pformat(script_config, sort_dicts=False))
+        logging.info(
+            "Initialized script %s with options:\n%s",
+            type(self).__name__,
+            pprint.pformat(script_config, sort_dicts=False),
+        )
 
     @classmethod
     def args(cls):
@@ -149,6 +166,7 @@ class InvokerScript:
 
     def embed(self):
         from IPython.terminal.embed import InteractiveShellEmbed
+
         caller_frame = inspect.currentframe().f_back
         module = get_module(caller_frame.f_globals["__file__"])
         shell = InteractiveShellEmbed(user_module=module)
@@ -171,22 +189,23 @@ def _initialize_logger(log_to_console, logfile_root, logfile_name):
         "version": 1,
         "formatters": {},
         "handlers": {},
-        "root": {
-            "level": os.getenv("INVOKER_LOGLEVEL", "INFO"),
-            "handlers": []
-        }
+        "root": {"level": os.getenv("INVOKER_LOGLEVEL", "INFO"), "handlers": []},
     }
 
     if log_to_console:
         logger_dict["formatters"]["pretty"] = {
             "format": "%(asctime)s [%(levelname)-8s] %(filename)s:%(lineno)d.%(funcName)s() %(message)s",
             "datefmt": "%H:%M:%S",
-            "class": "invoker.InvokerFormatter" if (__package__ == "") or (__package__ == None) else ".".join([__package__, "invoker.InvokerFormatter"]),
+            "class": (
+                "invoker.InvokerFormatter"
+                if (__package__ == "") or (__package__ is None)
+                else ".".join([__package__, "invoker.InvokerFormatter"])
+            ),
         }
         logger_dict["handlers"]["console"] = {
             "class": "logging.StreamHandler",
             "formatter": "pretty",
-            "stream": "ext://sys.stdout"
+            "stream": "ext://sys.stdout",
         }
         logger_dict["root"]["handlers"].append("console")
 
@@ -216,11 +235,11 @@ def _initialize_logger(log_to_console, logfile_root, logfile_name):
 
 class InvokerFormatter(logging.Formatter):
     LVL2COLOR = {
-        logging.DEBUG: "\x1b[38m", #  grey
-        logging.INFO: "\x1b[36m", #  blue
-        logging.WARNING: "\x1b[33m", #  yellow
-        logging.ERROR: "\x1b[31m", #  red
-        logging.CRITICAL: "\x1b[31;1m", #  bold_red
+        logging.DEBUG: "\x1b[38m",  # grey
+        logging.INFO: "\x1b[36m",  # blue
+        logging.WARNING: "\x1b[33m",  # yellow
+        logging.ERROR: "\x1b[31m",  # red
+        logging.CRITICAL: "\x1b[31;1m",  # bold_red
     }
     RESET = "\x1b[0m"
 
@@ -238,23 +257,21 @@ class ParserManager:
     def add_arguments(self, default_args, key_prefix=None):
         for k, v in default_args.items():
             try:
-                if type(v) == list:
+                if isinstance(v, list):
                     self.parser.add_argument(
                         _build_key(k, key_prefix),
                         type=type(v[0]) if len(v) > 0 else str,
                         nargs="+",
-                        default=v
+                        default=v,
                     )
-                elif type(v) == bool:
+                elif isinstance(v, bool):
                     self.parser.add_argument(
                         _build_key(k, key_prefix),
                         action="store_true" if not v else "store_false",
                     )
                 else:
                     self.parser.add_argument(
-                        _build_key(k, key_prefix),
-                        type=type(v),
-                        default=v
+                        _build_key(k, key_prefix), type=type(v), default=v
                     )
             except argparse.ArgumentError:
                 logging.warn("Script defaults over-riding module arg %s.", k)
@@ -263,11 +280,11 @@ class ParserManager:
         if args_dict is not None:
             args_list = []
             for k, v in args_dict.items():
-                if type(v) == list:
+                if isinstance(v, list):
                     args_list.append(_build_key(k, key_prefix))
                     for item in v:
                         args_list.append(str(item))
-                elif type(v) == bool:
+                elif isinstance(v, bool):
                     if v != self.parser.get_default(k):
                         args_list.append(_build_key(k, key_prefix))
                 else:
@@ -283,7 +300,7 @@ class ParserManager:
         return vars(self.parser.parse_args(args_list))
 
 
-def _build_key(kname: str, key_prefix: str =None) -> str:
+def _build_key(kname: str, key_prefix: str = None) -> str:
     return f"--{kname}" if key_prefix is None else f"--{key_prefix}.{kname}"
 
 
@@ -342,15 +359,19 @@ def get_embed_instrumented_module(file_name, instrument_line_num, instrument_lin
     script_class_name = _to_camel_case(file_name.replace(".py", ""))
     try:
         script_line_number = next(
-            i for i, line in enumerate(lines)
+            i
+            for i, line in enumerate(lines)
             if line.startswith(f"class {script_class_name}")
         )
     except StopIteration:
         raise RuntimeError("Invalid script %s", file_name)
 
-    get_indent = lambda line: len(line) - len(line.lstrip())
+    def get_indent(line):
+        return len(line) - len(line.lstrip())
 
-    valid_instrument_line = instrument_line_num is not None and instrument_line_num < len(lines)
+    valid_instrument_line = (
+        instrument_line_num is not None and instrument_line_num < len(lines)
+    )
     if not valid_instrument_line:
         in_run = False
         for index in range(script_line_number, len(lines) - 1):
@@ -383,11 +404,15 @@ def get_embed_instrumented_module(file_name, instrument_line_num, instrument_lin
     return module
 
 
-def get_script(file_name, instrument=False, instrument_line_num=None, instrument_line="exit()"):
+def get_script(
+    file_name, instrument=False, instrument_line_num=None, instrument_line="exit()"
+):
     if not instrument:
         module = get_module(file_name)
     else:
-        module = get_embed_instrumented_module(file_name, instrument_line_num, instrument_line)
+        module = get_embed_instrumented_module(
+            file_name, instrument_line_num, instrument_line
+        )
     class_name = _to_camel_case(file_name.replace(os.sep, ".").replace(".py", ""))
     script = getattr(module, class_name)
     return script
@@ -396,11 +421,19 @@ def get_script(file_name, instrument=False, instrument_line_num=None, instrument
 if __name__ == "__main__":
     _initialize_logger(True, None, "invoker")
 
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("command", choices = ["run", "debug"], type=str, help="Invoker script command.")
-    parser.add_argument("script_name", type=str, help="Target invoker script name. Optionally include line number to run until as <script_name>:<line_numbrer>")
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "command", choices=["run", "debug"], type=str, help="Invoker script command."
+    )
+    parser.add_argument(
+        "script_name",
+        type=str,
+        help="Target invoker script name. Optionally include line number to run until as <script_name>:<line_numbrer>",
+    )
 
-    if (len(sys.argv) < 3):
+    if len(sys.argv) < 3:
         parser.print_help(sys.stderr)
         exit()
 
@@ -413,12 +446,20 @@ if __name__ == "__main__":
     instrument_line_num = int(script_match.group(2)) if script_match.group(2) else None
 
     if args.command == "run":
-        script = get_script(script_name, instrument = instrument_line_num is not None, instrument_line_num = instrument_line_num, instrument_line = "exit()")
+        script = get_script(
+            script_name,
+            instrument=instrument_line_num is not None,
+            instrument_line_num=instrument_line_num,
+            instrument_line="exit()",
+        )
     elif args.command == "debug":
-        script = get_script(script_name, instrument = True, instrument_line_num = instrument_line_num, instrument_line = "self.embed()")
+        script = get_script(
+            script_name,
+            instrument=True,
+            instrument_line_num=instrument_line_num,
+            instrument_line="self.embed()",
+        )
     else:
         logging.error("Invalid command: %s.", args.command)
 
-    script(args_list = sys.argv[3:], run_as_root_script=True).run()
-
-
+    script(args_list=sys.argv[3:], run_as_root_script=True).run()

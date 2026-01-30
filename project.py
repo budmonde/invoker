@@ -1,11 +1,11 @@
+import re
+import subprocess
 from importlib import metadata
 from pathlib import Path
-import re
-import click
-import subprocess
 
 from resource_manager import ResourceManager
-from util import to_camel_case, raise_error, warn, is_editable_install
+from util import is_editable_install, raise_error, to_camel_case, warn
+
 
 class Project:
     def __init__(self, root_path):
@@ -17,7 +17,7 @@ class Project:
         if self.invoker_path.exists():
             raise_error(f"invoker module already exists at {self.invoker_path}!")
         ResourceManager.import_resource("invoker.py", self.invoker_path, sign=True)
-        self.project_version = metadata.version('invoker')
+        self.project_version = metadata.version("invoker")
         self.validate()
         return self
 
@@ -34,11 +34,13 @@ class Project:
     def check_version(self, error_on_mismatch=True):
         self._set_project_version()
         if self.project_version is None:
-            error_message = f"Cannot determine project version from {self.invoker_path}."
+            error_message = (
+                f"Cannot determine project version from {self.invoker_path}."
+            )
             raise_error(error_message) if error_on_mismatch else warn(error_message)
             return
-        
-        if self.project_version != metadata.version('invoker'):
+
+        if self.project_version != metadata.version("invoker"):
             error_message = f"Version mismatch: project v{self.project_version}, CLI v{metadata.version('invoker')}."
             raise_error(error_message) if error_on_mismatch else warn(error_message)
             return
@@ -47,10 +49,10 @@ class Project:
         if not self.invoker_path.exists():
             self.project_version = None
             return
-            
+
         with open(self.invoker_path, "r") as f:
             first_line = f.readline()
-            
+
         # Match version line format: # Invoker: v1.2.3
         version_match = re.match(r"# Invoker: v(\d+\.\d+\.\d+)", first_line.strip())
         if version_match:
@@ -59,9 +61,9 @@ class Project:
             self.project_version = None
 
     def lint(self):
-        subprocess.call(['black', self.root_path])
-        subprocess.call(['isort', self.root_path])
-        subprocess.call(['flake8', self.root_path])
+        subprocess.call(["black", self.root_path])
+        subprocess.call(["isort", self.root_path])
+        subprocess.call(["flake8", self.root_path])
 
     def create_module(self, module_name):
         # Create module directory
@@ -79,7 +81,9 @@ class Project:
         ResourceManager.import_resource(
             "module_base.py",
             module_base_path,
-            preprocess_fn=lambda l: l.replace("__MODULE__", to_camel_case(module_name)),
+            preprocess_fn=lambda line: line.replace(
+                "__MODULE__", to_camel_case(module_name)
+            ),
         )
 
     def create_script(self, script_name):
@@ -93,7 +97,9 @@ class Project:
         ResourceManager.import_resource(
             "script.py",
             script_path,
-            preprocess_fn=lambda l: l.replace("__SCRIPT__", to_camel_case(script_name)),
+            preprocess_fn=lambda line: line.replace(
+                "__SCRIPT__", to_camel_case(script_name)
+            ),
         )
         script_path.chmod(0o744)
 
@@ -104,38 +110,47 @@ class Project:
         script_path = self.root_path / f"{script_name}"
         if not script_path.exists():
             raise_error(f"script does not exist at {script_path}!")
-        subprocess.call(['python', 'invoker.py', 'run', script_name])
+        subprocess.call(["python", "invoker.py", "run", script_name])
 
     def debug_script(self, script_name_with_line_num):
         script_match = re.match(r"^(\w+\.\w+)(?::(\d+))?$", script_name_with_line_num)
         if not script_match:
-            raise_error(f"Invalid script name format: {script_name_with_line_num}. Expected format: script.py or script.py:line_number")
-        
+            raise_error(
+                f"Invalid script name format: {script_name_with_line_num}. Expected format: script.py or script.py:line_number"
+            )
+
         script_name = script_match.group(1)
-        embed_line_num = int(script_match.group(2)) if script_match.group(2) else None
 
         script_path = self.root_path / f"{script_name}"
         if not script_path.exists():
             raise_error(f"script does not exist at {script_path}!")
-        subprocess.call(['python', 'invoker.py', 'debug', script_name_with_line_num])
+        subprocess.call(["python", "invoker.py", "debug", script_name_with_line_num])
 
     def import_resource(self, resource_rel_path, dest_rel_path=None):
         self.validate()
-        target_rel_path = dest_rel_path if dest_rel_path is not None else resource_rel_path
+        target_rel_path = (
+            dest_rel_path if dest_rel_path is not None else resource_rel_path
+        )
         dest_path = self.root_path / target_rel_path
         dest_path.parent.mkdir(parents=True, exist_ok=True)
         if dest_path.exists():
             backup_path = Path(str(dest_path) + ".bak")
-            warn(f"Overwriting existing file at {dest_path}. Backing up to {backup_path}")
+            warn(
+                f"Overwriting existing file at {dest_path}. Backing up to {backup_path}"
+            )
             if backup_path.exists():
-                raise_error(f"Backup file already exists: {backup_path}. Aborting import.")
+                raise_error(
+                    f"Backup file already exists: {backup_path}. Aborting import."
+                )
             dest_path.rename(backup_path)
         ResourceManager.import_resource(resource_rel_path, dest_path, sign=True)
 
     def export_resource(self, resource_rel_path: str, dest_rel_path: str = None):
         self.validate()
         if not is_editable_install():
-            raise_error("Invoker must be installed in editable mode to export resources. Reinstall with 'pip install -e .'.")
+            raise_error(
+                "Invoker must be installed in editable mode to export resources. Reinstall with 'pip install -e .'."
+            )
         src = self.root_path / resource_rel_path
         if not src.exists():
             raise_error(f"Source file does not exist: {src}")

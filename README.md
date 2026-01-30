@@ -126,7 +126,7 @@ Development dependencies (install with `pip install -e ".[dev]"`):
 - **pytest** - Testing framework
 - **pytest-cov** - Test coverage
 - **black** - Code formatter
-- **isort** - Import organizer  
+- **isort** - Import organizer
 - **flake8** - Code linter
 
 See `pyproject.toml` for specific version requirements.

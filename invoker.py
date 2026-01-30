@@ -40,7 +40,12 @@ def create():
 
 @cli.command(name="import")
 @click.argument("resource_path")
-@click.option("--dest", "dest_path", default=None, help="Optional destination relative path in project")
+@click.option(
+    "--dest",
+    "dest_path",
+    default=None,
+    help="Optional destination relative path in project",
+)
 def import_cmd(resource_path, dest_path):
     click.secho(f"Importing {resource_path}...", fg="yellow")
     project = Project(Path())
@@ -51,7 +56,12 @@ def import_cmd(resource_path, dest_path):
 
 @cli.command(name="export")
 @click.argument("resource_path")
-@click.option("--dest", "dest_path", default=None, help="Optional destination relative resource path")
+@click.option(
+    "--dest",
+    "dest_path",
+    default=None,
+    help="Optional destination relative resource path",
+)
 def export_cmd(resource_path, dest_path):
     click.secho(f"Exporting {resource_path}...", fg="yellow")
     project = Project(Path())

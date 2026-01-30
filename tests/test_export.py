@@ -1,8 +1,8 @@
-from pathlib import Path
 from datetime import date
 from importlib import metadata
-import pytest
+from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
 from invoker import cli
@@ -21,7 +21,9 @@ def export_setup(temp_project_dir, monkeypatch):
     sandbox.mkdir(parents=True, exist_ok=True)
     header_path = sandbox / "_header.txt"
     # Load the real header template from the repository resources
-    repo_header = (Path(__file__).resolve().parent.parent / "resources" / "_header.txt").read_text(encoding="utf-8")
+    repo_header = (
+        Path(__file__).resolve().parent.parent / "resources" / "_header.txt"
+    ).read_text(encoding="utf-8")
     header_path.write_text(repo_header, encoding="utf-8")
     runner = CliRunner()
     return {
@@ -48,8 +50,12 @@ class TestExport:
         project.export_resource(rel_path)
 
         dest = sandbox / rel_path
-        assert dest.exists(), "Export should create the new resource in package resources"
-        assert dest.read_text(encoding="utf-8") == content, "Exported content should match source"
+        assert (
+            dest.exists()
+        ), "Export should create the new resource in package resources"
+        assert (
+            dest.read_text(encoding="utf-8") == content
+        ), "Exported content should match source"
 
     def test_project_export_overwrite_resource(self, export_setup):
         project = export_setup["project"]
@@ -73,10 +79,11 @@ class TestExport:
         first_src.write_text(second_content, encoding="utf-8")
         project.export_resource(first_src_rel, dest_rel_path=dest_rel)
 
-        assert dest.read_text(encoding="utf-8") == second_content, "Destination resource should be overwritten"
+        assert (
+            dest.read_text(encoding="utf-8") == second_content
+        ), "Destination resource should be overwritten"
 
     def test_cli_export_new_resource(self, export_setup):
-        project = export_setup["project"]
         sandbox = export_setup["sandbox"]
         root = export_setup["root"]
         monkeypatch = export_setup["monkeypatch"]
@@ -90,11 +97,17 @@ class TestExport:
 
         monkeypatch.chdir(root)
         result = runner.invoke(cli, ["export", rel_path])
-        assert result.exit_code == 0, f"CLI export should succeed. Output: {result.output}"
+        assert (
+            result.exit_code == 0
+        ), f"CLI export should succeed. Output: {result.output}"
 
         dest = sandbox / rel_path
-        assert dest.exists(), "CLI export should create the new resource in package resources"
-        assert dest.read_text(encoding="utf-8") == content, "Exported content should match source"
+        assert (
+            dest.exists()
+        ), "CLI export should create the new resource in package resources"
+        assert (
+            dest.read_text(encoding="utf-8") == content
+        ), "Exported content should match source"
 
     def test_project_export_strips_invoker_header(self, export_setup):
         project = export_setup["project"]
@@ -123,7 +136,9 @@ class TestExport:
         dest_text = dest.read_text(encoding="utf-8")
 
         # Header should be stripped; only body should remain
-        assert dest_text == "".join(body), "Export should strip invoker header from source file"
+        assert dest_text == "".join(
+            body
+        ), "Export should strip invoker header from source file"
 
     def test_project_export_existing_unchanged_skips(self, export_setup, capsys):
         project = export_setup["project"]
@@ -139,7 +154,7 @@ class TestExport:
         body_hash = ResourceManager._compute_hash(body.encode("ascii"))
         header_template = (sandbox / "_header.txt").read_text(encoding="utf-8")
         header_text = header_template.format(
-            version=metadata.version('invoker'),
+            version=metadata.version("invoker"),
             resource=rel_path,
             date=date.today().strftime("%Y-%m-%d"),
             hash=body_hash,
@@ -155,7 +170,9 @@ class TestExport:
         # No file should be written since there are no manual edits
         captured = capsys.readouterr()
         assert "Skipping export" in captured.err
-        assert not dest.exists(), "Export should be skipped for unchanged generated resources"
+        assert (
+            not dest.exists()
+        ), "Export should be skipped for unchanged generated resources"
 
     def test_project_export_existing_modified_overwrites(self, export_setup, capsys):
         project = export_setup["project"]
@@ -172,7 +189,7 @@ class TestExport:
         stored_hash = ResourceManager._compute_hash(body_original.encode("ascii"))
         header_template = (sandbox / "_header.txt").read_text(encoding="utf-8")
         header_text = header_template.format(
-            version=metadata.version('invoker'),
+            version=metadata.version("invoker"),
             resource=rel_path,
             date=date.today().strftime("%Y-%m-%d"),
             hash=stored_hash,
@@ -192,8 +209,6 @@ class TestExport:
         assert dest.read_text(encoding="utf-8") == body_modified
 
     def test_cli_export_non_editable_install_raises(self, export_setup, capsys):
-        project = export_setup["project"]
-        sandbox = export_setup["sandbox"]
         root = export_setup["root"]
         monkeypatch = export_setup["monkeypatch"]
 
@@ -207,12 +222,13 @@ class TestExport:
 
         monkeypatch.chdir(root)
         with pytest.raises(SystemExit):
-            cli.main(args=["export", rel_path], prog_name="invoker", standalone_mode=False)
+            cli.main(
+                args=["export", rel_path], prog_name="invoker", standalone_mode=False
+            )
         captured = capsys.readouterr()
         assert "editable mode" in captured.err
 
     def test_cli_export_missing_source_raises(self, export_setup, capsys):
-        project = export_setup["project"]
         root = export_setup["root"]
         monkeypatch = export_setup["monkeypatch"]
 
@@ -221,8 +237,8 @@ class TestExport:
 
         monkeypatch.chdir(root)
         with pytest.raises(SystemExit):
-            cli.main(args=["export", rel_path], prog_name="invoker", standalone_mode=False)
+            cli.main(
+                args=["export", rel_path], prog_name="invoker", standalone_mode=False
+            )
         captured = capsys.readouterr()
         assert "Source file does not exist" in captured.err
-
-

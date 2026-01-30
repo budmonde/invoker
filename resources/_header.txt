@@ -6,5 +6,3 @@
 # Resource name: {resource}
 # Date: {date}
 # Hash:	{hash}
-
-
